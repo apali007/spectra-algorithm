@@ -9,6 +9,9 @@ output/
 # SLURM logs
 logs/
 
+# Model checkpoints
+spectra-chat-checkpoints/
+
 # Miniconda installer
 Miniconda3-*.sh
 

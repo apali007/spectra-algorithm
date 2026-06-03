@@ -227,16 +227,125 @@ def batch_inference(model, tokenizer, input_file, output_file=None):
 
     return results
     
+# entry point of the inference script. Handles argument parsing and decides which mode to run.
 def main():
+
+    # argparse lets you control your script from the terminal without editing code.
+    
+    # # Training
+    # python finetunemodel.py --data sample1_spectra_training_data.jsonl --epochs 1
+
+    # # Single prediction
+    # python inference.py --checkpoint ./spectra-chat-checkpoints/final --text "88.03 1100\n175.11 2200"
+
+    # # Batch prediction
+    # python inference.py --checkpoint ./spectra-chat-checkpoints/final --batch myspectra.jsonl --output results.json
+
+    # # Interactive mode
+    # python inference.py --checkpoint ./spectra-chat-checkpoints/final
+
+    # creates the argument parser.
+    # RawDescriptionHelpFormatter preserves formatting in the help text
+    # epilog="" is where user had usage examples
     parser = argparse.ArgumentParser(
         description="SpectraChatModel Inference",
         formatter_class = argparse.RawDescriptionHelpFormatter,
         epilog=""
     )
 
+    # path to the saved model checkpoint. Defaults to where finetunemodel.py saves it
     parser.add_argument(
         "--checkpoint",
         type=str,
         default="./spectra-chat-checkpoints/final",
         help="Path to model checkpoint directory"
     )
+
+    # Flag to use merged 16-bit model instead of LoRA adapters
+    parser.add_argument(
+        "--merged",
+        action="store_true",
+        help="Use merged 16-bit model (for LoRA checkpoints)"
+    )
+
+    # 4-bit is disabled and the model laods in full precision, uses more GPU memory but more accurate
+    parser.add_argument(
+        "--no-4bit",
+        action="store_true",
+        help="Disable 4-bit quantization (requires more memory)"
+    )
+
+    # For single spectrum prediction directly from command line
+    parser.add_argument(
+        "--text",
+        type=str,
+        default=None,
+        help="Spectrum text for single prediction"
+    )
+
+    # Path to input file for batch processing
+    parser.add_argument(
+        "--batch",
+        type=str,
+        default=None,
+        help="Input file for batch processing (JSON or text)"
+    )
+
+    # Path to save batch results
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Output file for batch processing (JSON or text)"
+    )
+
+    # Maximum tokens to generate
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=512,
+        help="Maximum tokens to generate"
+    )
+
+    # sampling temperature
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.1,
+        help="Sampling temperature (0.0-1.0)"
+    )
+
+    args = parser.parse_args()
+
+    # loading Model
+    # not args.no_4bit means 4-bit is on by default, disabled if --no-4bit flag is passed
+    global model, tokenizer
+    model, tokenizer = load_model(
+        args.checkpoint,
+        use_merged=args.merged,
+        load_in_4bit=not args.no_4bit
+    )
+
+    # mode selection
+    # if "--text" argument is provided, run single prediction mode
+    if args.text:
+        print("Analyzing spectrum...")
+        prediction = predict_from_spectrum(
+            model, tokenizer, args.text,
+            max_new_tokens = args.max_tokens,
+            temperature = args.temperature
+        )
+
+        print("PREDICTION:")
+        print(prediction)
+
+    # if "--batch" argument is provided, run batch processing mode
+    elif args.batch:
+        batch_inference(model, tokenizer, args.batch, args.output)
+
+    # if neither provided, launch interactive terminal mode.
+    else:
+        interactive_mode(model, tokenizer)
+
+if __name__ == "__main__":
+    main()

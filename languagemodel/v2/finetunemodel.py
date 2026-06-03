@@ -34,6 +34,7 @@ LEARNING_RATE = 2e-4
 # Warmup gradually increases the learning rate at the start of training to stabalize it.
 WARMUP_RATIO = 0.05
 
+# During training, the model weights change every step. A checkpoint is a snapshot of the model at a specific training, saved to disk so you dont lose progress.
 OUTPUT_DIR = "./spectra-chat-checkpoints"
 
 # Takes the path from JSONL/input file and the tokenizer. Returns formatted train and test datasets
@@ -182,6 +183,28 @@ def main():
 
         # evaluate on the test set and save a check point after every epoch
         eval_strategy = "epoch",
+        #checkpoint log
+        
+        # training at a step
+        # {'loss': 0.9992, 'grad_norm': 0.35, 'learning_rate': 7.77e-05, 'epoch': 0.89}
+        # loss - how wrong the model. Lower the better
+        # grad_norm - how big the weight updates were
+        # learning_rate - the learning rate at this point
+        # epoch - how much percentage through epoch 1
+
+        # Evaluation results of that step
+        # {'eval_loss': 0.778, 'eval_runtime': 7.8, 'eval_samples_per_second': 1.28, 'epoch': 1.0}
+        # eval_loss - how wrong the model was on the batch of examples it never trained on. Lower than train loss it a good sign
+        # eval_samples_per_second - processed how many examples per second during evaluation
+        # epoch - end of epoch 1
+
+        # Final training summary
+        # {'eval_loss': 0.778, 'eval_runtime': 7.8, 'eval_samples_per_second': 1.28, 'epoch': 1.0}
+        # training_runtime - entire training took in seconds
+        # train_samples_per_second - average loss across all training steps
+        # epoch - completed 1 fill epoch
+
+        # This means save a checkpoint after every epoch
         save_strategy = "epoch",
 
         # only keep the 2 most recent checkpoints. Older ones get deleted to save disk space.
@@ -222,6 +245,8 @@ def main():
     # stats tolds the final loss and training metrics
     stats = trainer.train()
 
+    # /final -> Lora weights as safe tensors (small size): parameters changed during training
+    # safetensor -> trained weigts of the neural network stored on a disk
     final_dir = args.output_dir + "/final"
 
     # Save the LoRA adapter weights and tokenizer
@@ -230,6 +255,7 @@ def main():
 
     if not args.full:
 
+        # All 14 billion paramterts, both the original Qwen weights and your LoRA weights combined together into one complete model
         merged_dir = args.output_dir + "/merged_16bit"
 
         # merges the LoRA weights back into the base model and saves as full 16-bit weights. Useful for deployment.
