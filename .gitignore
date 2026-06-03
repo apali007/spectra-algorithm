@@ -1,0 +1,26 @@
+# Data files
+*.parquet
+*.csv
+*.zip
+
+# Generated outputs
+output/
+
+# SLURM logs
+logs/
+
+# Miniconda installer
+Miniconda3-*.sh
+
+# Editor autosaves
+*.save
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Virtual environments
+.env
+.venv
