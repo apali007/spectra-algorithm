@@ -16,6 +16,128 @@ MASS_NH3 = 17.02655
 MASS_PROTON =  1.00728
 MASS_C13    = 1.00335 # Mass Difference between C-12 and C-13
 
+def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance):
+
+    is_y = ion_type == 'y'
+    
+    precursor_neutral_mass = (precursor_mz * precursor_charge) - (precursor_charge* MASS_PROTON)
+
+    completed_sequences = []
+
+    for start_aa, start_residue_mass in candidates.items():
+
+        sequence = [start_aa] # b1 or y1 initialized
+        current_residue_sum = start_residue_mass # b1 or y1 neutral mass initialized
+        print(f"Ion Type: {ion_type} | start_candidate_AA: {start_aa}")
+
+        while True:
+            if abs(precursor_neutral_mass - current_residue_sum - MASS_H2O) < termination_tolerance:
+                print(f" [{ion_type}] Completed: {''.join(sequence)} | residue sum = {current_residue_sum:.4f}")
+                completed_sequences.append(''.join(sequence))
+                break
+            
+            next_aa_hits = []
+            for next_aa, next_mass in AA_MASSES.items():
+                
+                for experimental_mz in mz:
+                    for charge in range(1, precursor_charge + 1):
+                        experimental_mz_neutral = experimental_mz * charge - (charge * MASS_PROTON) 
+                        # for nl_mass in [0, MASS_H2O, MASS_NH3]:
+                        for nl_mass in [0]:
+                            recovered_experimental_mz_mass = experimental_mz_neutral + nl_mass
+                            #make singly charged
+                            recovered_experimental_mz_mass_singly = recovered_experimental_mz_mass + MASS_PROTON
+
+                            if is_y:
+                                expected_mz = current_residue_sum + next_mass + MASS_H2O + MASS_PROTON
+                            else:
+                                expected_mz = current_residue_sum + next_mass + MASS_PROTON
+                            
+                            if abs(expected_mz - recovered_experimental_mz_mass_singly) <= tolerance:
+                                # print(f"matched experimental_mz = {experimental_mz:.6f} charge={charge} nl={nl_mass:.5f}")
+                                next_aa_hits.append((next_aa, next_mass))
+            
+            next_aa_hits = [('L' if aa == 'I' else aa, mass) for aa, mass in next_aa_hits]
+            unique_aa_hits = list({aa: mass for aa, mass in next_aa_hits}.items())
+
+            if len(unique_aa_hits) == 0:
+                # check if remaining mass = one AA
+                if is_y:
+                    remaining_mass = precursor_neutral_mass - current_residue_sum - MASS_H2O
+                else:
+                    remaining_mass = precursor_neutral_mass - current_residue_sum - MASS_H2O
+                
+                last_aa_found = False
+                for aa, mass in AA_MASSES.items():
+                    if abs(remaining_mass-mass) < termination_tolerance:
+                        sequence.append(aa)
+                        current_residue_sum +=mass
+                        print(f"[{ion_type}] Completed: {''.join(sequence)}")
+                        completed_sequences.append(''.join(sequence))
+                        last_aa_found = True
+                       
+                if not last_aa_found:
+                     print(f"[{ion_type}] Dead end at: {''.join(sequence)}")
+                break
+
+            elif len(unique_aa_hits) > 1:
+
+                print(f"[{ion_type}] Ambigous end at: {''.join(sequence)} -> hits: {unique_aa_hits}")
+                # print(f" current_residue_sum: {current_residue_sum:.6f}")
+                # for hit_aa, hit_mass in unique_aa_hits:
+                #     if is_y:
+                #         exp = current_residue_sum + hit_mass + MASS_H2O + MASS_PROTON
+                #     else:
+                #         exp = current_residue_sum + hit_mass + MASS_PROTON
+                    # print(f" {hit_aa}: expected_mz={exp:.6f}")
+                break
+            else:
+                next_aa, next_mass = unique_aa_hits[0]
+                sequence.append(next_aa)
+                current_residue_sum += next_mass
+
+    return completed_sequences
+
+
+def derive_full_sequence(mz, intensity, y1_candidates, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance):
+    y_sequences = extend_ladder('y', mz, intensity, y1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance)
+    b_sequences = extend_ladder('b', mz, intensity, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance)
+    
+
+    return y_sequences, b_sequences
+
+def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge, tolerance, termination_tolerance):
+
+    # first derive y1 and b1
+
+    y1_candidates_approach1, b1_candidates_approach1 = find_y1_b1_approach1(mz, intensity, tolerance)
+
+    y1_candidates_approach2, b1_candidates_approach2 = find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge,tolerance)
+
+    print(f"\nPeptide: {label_peptide}")
+    # print(f" Approach  1 - y1: {y1_candidates_approach1} | b1: {b1_candidates_approach1}")
+    # print(f" Approach  2 - y1: {y1_candidates_approach2} | b1: {b1_candidates_approach2}")
+
+    true_y1_aa = label_peptide[-1]
+    true_b1_aa = label_peptide[0]
+    # print(f" Expected y1: {true_y1_aa} |  Expected b1: {true_b1_aa}")
+
+    y1_candidates = {**y1_candidates_approach1, **y1_candidates_approach2}
+    b1_candidates = {**b1_candidates_approach1, **b1_candidates_approach2}
+
+    print(f"y1_candidates: {y1_candidates}")
+    print(f"b1_candidates: {b1_candidates}")
+
+    y_sequences, b_sequences = derive_full_sequence(
+        mz, intensity, y1_candidates, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance
+        )
+    
+    print(f"y_sequences: {y_sequences}")
+    print(f"b_sequences: {b_sequences}")
+    print("==============")
+
+    return y_sequences, b_sequences
+    
 def filter_top_peaks(mz, intensity, top_n):
     mz_array = np.array(mz)
     intensity_array = np.array(intensity)
@@ -23,20 +145,6 @@ def filter_top_peaks(mz, intensity, top_n):
     top_indices = np.argsort(intensity_array)[-top_n:]
 
     return mz_array[top_indices].tolist()
-
-def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge, tolerance):
-
-    y1_candidates_approach1, b1_candidates_approach1 = find_y1_b1_approach1(mz, intensity, tolerance)
-
-    y1_candidates_approach2, b1_candidates_approach2 = find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge,tolerance)
-
-    print(f"\nPeptide: {label_peptide}")
-    print(f" Approach  1 - y1: {y1_candidates_approach1} | b1: {b1_candidates_approach1}")
-    print(f" Approach  2 - y1: {y1_candidates_approach2} | b1: {b1_candidates_approach2}")
-
-    true_y1_aa = label_peptide[-1]
-    true_b1_aa = label_peptide[0]
-    print(f" Expected y1: {true_y1_aa} |  Expected b1: {true_b1_aa}")
 
 def find_y1_b1_approach1(mz, intensity, tolerance):
     y1_candidates = {}
@@ -163,7 +271,7 @@ def parse_mgf(mgf_path, max_valid_spectra=1000):
 def is_valid_peptide(peptide):
     return bool(peptide) and bool(re.fullmatch(r'[A-Z]+', peptide)) and all(aa in AA_MASSES for aa in peptide)
 
-def process_mgf(mgf_path,output_path,tolerance,num_examples):
+def process_mgf(mgf_path,output_path,tolerance,termination_tolerance, num_examples):
     spectra = parse_mgf(mgf_path)
     # dataset = []
 
@@ -175,32 +283,20 @@ def process_mgf(mgf_path,output_path,tolerance,num_examples):
         intensity = spec.get("intensity")
         pep_mass = spec.get("pepmass")
         pep_charge = spec.get("charge")
-        # if not is_valid_peptide(peptide):
-        #     continue
-        derive_peptide( mz, intensity, peptide, pep_mass, pep_charge, tolerance)
+
+        derive_peptide( mz, intensity, peptide, pep_mass, pep_charge, tolerance, termination_tolerance)
 
 
-    #     dataset.append({
-    #         "input": spectrum_to_input_text(spec["mz"], spec["intensity"]),
-    #         "output": build_resoning_trace(peptide, spec["mz"], spec["intensity"], tolerance=tolerance),
-    #         "peptide": peptide,
-    #         "title": spec["title"],
-    #     })
-
-    # with open(output_path, "w") as f:
-    #     for ex in dataset:
-    #         f.write(json.dumps({"input": ex["input"], "output": ex["output"]}) + "\n")
-
-    # return dataset
-
-
-def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
+def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, max_spectra=1):
 
     meta_data = pd.read_parquet(meta_data_path)
-
     annot_data = pd.read_parquet(annotation_data_path)
 
     meta_data = meta_data[meta_data['modified_sequence'].apply(is_valid_peptide)]
+
+    if correct_instances_path:
+        correct_df = pd.read_csv(correct_instances_path)
+        meta_data = meta_data.merge(correct_df[['scan_number', 'raw_file']], on=['scan_number', 'raw_file'], how = 'inner')
 
     spectra = []
 
@@ -228,43 +324,93 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
             'precursor_charge': int(row['precursor_charge']),
             'mz': mz_list,
             'intensity': None,
+            'scan_number': scan,
+            'raw_file': raw_file,
         })
 
     return spectra
 
-def process_prospect(annotation_data_path, meta_data_path, tolerance, num_examples):
-    spectra = load_prospect(annotation_data_path, meta_data_path, num_examples)
+def process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance, termination_tolerance, num_examples):
+    spectra = load_prospect(annotation_data_path, meta_data_path, correct_instances_path, num_examples)
+
+    total = 0
+    y_correct = 0
+    b_correct = 0
+    both_correct = 0
+    # correct_instances = []
+
+    def normalize(s):
+        return s.replace('I', 'L')
 
     for spec in spectra:
-        derive_peptide(
+        total += 1
+        peptide = spec['peptide']
+        true_y = normalize(peptide[::-1])
+        true_b = normalize(peptide)
+
+
+        y_seqs, b_seqs = derive_peptide(
             spec['mz'],
             spec['intensity'],
             spec['peptide'],
             spec['precursor_mz'],
             spec['precursor_charge'],
-            tolerance
+            tolerance,
+            termination_tolerance
         )
+
+        y_match = any(normalize(s) == true_y for s in y_seqs)
+        b_match = any(normalize(s) == true_b for s in b_seqs)
+
+        if y_match: y_correct +=1
+        if b_match: b_correct +=1
+        if y_match and b_match: both_correct += 1
+        # if y_match or b_match:
+        #     correct_instances.append({
+        #         'scan_number': spec['scan_number'],
+        #         'raw_file':spec['raw_file'],
+        #         'peptide':peptide
+        #     })
+
+    print("Results:")
+    print(f"Total: {total}")
+    print(f"Y correct: {y_correct} ({100*y_correct/total:.1f}%)")
+    print(f"B correct: {b_correct} ({100*b_correct/total:.1f}%)")
+    print(f"Both correct: {both_correct} ({100*both_correct/total:.1f}%)")
+
+    # # Store correct peptides
+    # pd.DataFrame(correct_instances).to_csv('output/correct_instances.csv', index=False)
+    # print(f"Saved {len(correct_instances)} correct instances")
+              
 
 
 if __name__ == "__main__":
 
     isProspect = True
+    filterCorrectPeptides = True
+
 
     if isProspect:
+        if filterCorrectPeptides:
+            correct_instances_path = "/lclhome/apali007/projects/spectra_algorithm/output/correct_instances.csv"
+        else:
+            correct_instances_path = ""
         annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool/TUM_third_pool_1_01_01_annotation.parquet"
         meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
         OUTPUT_PATH = "output/prospect_bottom_up_spectra_training_data.json"
         TOLERANCE = 0.005
+        TERMINATION_TOLERANCE= 0.005
         VERBOSE = False
         NUM_EXAMPLES = 20
 
-        process_prospect(annotation_data_path, meta_data_path, tolerance=TOLERANCE, num_examples=NUM_EXAMPLES)
+        process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES)
 
     else:
         MGF_PATH = "/disk/raptor-array/SaeedLab-Data/Mass-Spec/SpectralLibraries/Massive-KB-v1/LIBRARY_CREATION_AUGMENT_LIBRARY_TEST-82c0124b-download_filtered_mgf_library-main.mgf"
         OUTPUT_PATH = "output/bottom_up_spectra_training_data.json"
         TOLERANCE = 0.02
+        TERMINATION_TOLERANCE= 0.01
         VERBOSE = False
         NUM_EXAMPLES = None
 
-        process_mgf(MGF_PATH, OUTPUT_PATH, tolerance=TOLERANCE, num_examples=NUM_EXAMPLES)
+        process_mgf(MGF_PATH, OUTPUT_PATH, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES)

@@ -79,13 +79,20 @@ def prepare_input(spectrum_text, tokenizer, device, system_prompt=None):
     )
 
 # moving to device
-# inputs is a dictionary with keys like "input_ids" and "attention_mask". We extract just the "input_ids" and move them to GPU.
-    input_ids = inputs["input_ids"].to(device)
+# inputs is a dictionary with keys like "input_ids" and "attention_mask". We extract just the "input_ids" and move them to GPU. 
+# The attention mask is a binary flag, 1 means real token, 0 means padding. This tells the model "pay attention to these positions, ignore these"
+# In our setup, tokenizer.pad_token = tokenizer.eos_token, we set the padding token to be the same as the end-of-sequence token. so now:
+# Real tokens:    [1, 5, 8, 3, EOS] 
+# Padding tokens: [1, 5, 8, 3, EOS, EOS, EOS]
+# The model cant tell the difference between a real EOS and a padding EOS. So, we need to pass attention mask explicitly.
 
-    return input_ids
+    input_ids = inputs["input_ids"].to(device)
+    attention_mask = inputs["attention_mask"].to(device)
+
+    return input_ids, attention_mask
 
 # takes the model tokenizer, and input tensor. Has sensible defaults, generate up to 512 tokens, low temperature for near-deterministic output.
-def generate_prediction(model, tokenizer, inputs, max_new_tokens=512, temperature=0.1, do_sample=True):
+def generate_prediction(model, tokenizer, inputs, attention_mask, max_new_tokens=512, temperature=0.1, do_sample=True):
 
 # saves how many tokens the input has. We'll use to slice the input portion from the ouput. shape[-1] gets the last dimension which is the sequence length.
     input_length = inputs.shape[-1]
@@ -95,6 +102,7 @@ def generate_prediction(model, tokenizer, inputs, max_new_tokens=512, temperatur
         # generates new tokens. The model takes the input tokens and keeps predicting the next token until it hits max_new_tokens or generates an eos token.
         outputs = model.generate(
             input_ids = inputs,
+            attention_mask = attention_mask,
             max_new_tokens = max_new_tokens,
             temperature = temperature,
             do_sample = do_sample,
@@ -121,8 +129,8 @@ def generate_prediction(model, tokenizer, inputs, max_new_tokens=512, temperatur
 def predict_from_spectrum(model, tokenizer, spectrum_text, **generation_kwargs):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    inputs = prepare_input(spectrum_text, tokenizer, device)
-    prediction = generate_prediction(model, tokenizer, inputs, **generation_kwargs)
+    inputs, attention_mask = prepare_input(spectrum_text, tokenizer, device)
+    prediction = generate_prediction(model, tokenizer, inputs, attention_mask, **generation_kwargs)
     return prediction
 
 # takes the laoded model and tokenizer. This is the function that runs when you launch inference without any input file, like a chat interface in your terminal.

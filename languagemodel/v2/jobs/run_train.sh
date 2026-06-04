@@ -4,7 +4,7 @@
 #SBATCH --error=logs/train_%j.err
 #SBATCH --partition=compute
 #SBATCH --gres=gpu:1
-#SBATCH --time=02:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=40G
 
 source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh

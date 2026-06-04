@@ -5,5 +5,8 @@
 #SBATCH --time=02:00:00
 #SBATCH --mem=16G
 
+source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
+conda activate spectra
+
 cd ~/projects/spectra_algorithm
-python3 scripts/bottom_up_MS_generate_spectra_description.py
+python scripts/bottom_up_spectra_algorithm.py
