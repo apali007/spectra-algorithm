@@ -161,6 +161,9 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
             input_text = spectra_instance.get('input', None)
             ground_truth = spectra_instance.get('peptide', None)
             y_match = spectra_instance.get('y_match', None)
+            scan_number = spectra_instance.get('scan_number', None)
+            raw_file = spectra_instance.get('raw_file', None)
+
 
             prediction = predict_from_single_spectrum(
                 model, tokenizer, input_text,
@@ -171,7 +174,9 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
                 "input":input_text,
                 "prediction":prediction,
                 "ground_truth": ground_truth,
-                "y_match": y_match
+                "y_match": y_match,
+                "scan_number": scan_number,
+                "raw_file": raw_file,
             })
 
             if output_path:
