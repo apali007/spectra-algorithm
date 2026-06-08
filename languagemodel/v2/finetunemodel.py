@@ -2,7 +2,7 @@
 import argparse
 # loads the training file into structured dataset object that the trainer understands
 from datasets import load_dataset
-# Unsloth is a an optimized LLM training library. FastLanguageModel loads the model efficiently with quantization. is_bfloat16_supported checks if your GPR supprots bfloat16 precision
+# Unsloth is a an optimized LLM training library. FastLanguageModel loads the model efficiently with quantization. is_bfloat16_supported checks if your GPU supprots bfloat16 precision
 from unsloth import FastLanguageModel, is_bfloat16_supported
 # SFT trainer does supervised fine tuning. SFTConfig holds all the training hyperparameters
 from trl import SFTTrainer, SFTConfig

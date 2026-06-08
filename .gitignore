@@ -6,8 +6,14 @@
 # Generated outputs
 output/
 
+input_data/
+
+checkpoints/
+
 # SLURM logs
 logs/
+
+data/
 
 # Model checkpoints
 spectra-chat-checkpoints/

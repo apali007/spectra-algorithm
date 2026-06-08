@@ -41,6 +41,7 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                 
                 for experimental_mz in mz:
                     for charge in range(1, precursor_charge + 1):
+                    # for charge in range(2):
                         experimental_mz_neutral = experimental_mz * charge - (charge * MASS_PROTON) 
                         # for nl_mass in [0, MASS_H2O, MASS_NH3]:
                         for nl_mass in [0]:
@@ -110,9 +111,16 @@ def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge,
 
     # first derive y1 and b1
 
+    
+    # y1_candidates_approach1 = {}
+    # b1_candidates_approach1 = {}
+
     y1_candidates_approach1, b1_candidates_approach1 = find_y1_b1_approach1(mz, intensity, tolerance)
 
     y1_candidates_approach2, b1_candidates_approach2 = find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge,tolerance)
+
+    # y1_candidates_approach2 = {}
+    # b1_candidates_approach2 = {}
 
     print(f"\nPeptide: {label_peptide}")
     # print(f" Approach  1 - y1: {y1_candidates_approach1} | b1: {b1_candidates_approach1}")
@@ -287,7 +295,7 @@ def process_mgf(mgf_path,output_path,tolerance,termination_tolerance, num_exampl
         derive_peptide( mz, intensity, peptide, pep_mass, pep_charge, tolerance, termination_tolerance)
 
 
-def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, max_spectra=1):
+def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, max_spectra):
 
     meta_data = pd.read_parquet(meta_data_path)
     annot_data = pd.read_parquet(annotation_data_path)
@@ -301,7 +309,7 @@ def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, m
     spectra = []
 
     for i, (_,row) in enumerate(meta_data.iterrows()):
-        if i>= max_spectra:
+        if max_spectra is not None and i>= max_spectra:
             break
         
         scan = row['scan_number']
@@ -337,7 +345,8 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
     y_correct = 0
     b_correct = 0
     both_correct = 0
-    # correct_instances = []
+    y_or_b_correct = 0
+    correct_instances = []
 
     def normalize(s):
         return s.replace('I', 'L')
@@ -365,21 +374,28 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
         if y_match: y_correct +=1
         if b_match: b_correct +=1
         if y_match and b_match: both_correct += 1
-        # if y_match or b_match:
-        #     correct_instances.append({
-        #         'scan_number': spec['scan_number'],
-        #         'raw_file':spec['raw_file'],
-        #         'peptide':peptide
-        #     })
+        if y_match or b_match: y_or_b_correct+= 1
+        if y_match or b_match:
+            correct_instances.append({
+                'scan_number': spec['scan_number'],
+                'raw_file':spec['raw_file'],
+                'peptide':peptide,
+                'y_correct': y_match,
+                'b_correct': b_match,
+                'y_sequences': y_seqs,
+                'b_sequences': b_seqs,
+            })
 
     print("Results:")
     print(f"Total: {total}")
     print(f"Y correct: {y_correct} ({100*y_correct/total:.1f}%)")
     print(f"B correct: {b_correct} ({100*b_correct/total:.1f}%)")
+    print(f"Y or B correct: {y_or_b_correct} ({100*y_or_b_correct/total:.1f}%)")
     print(f"Both correct: {both_correct} ({100*both_correct/total:.1f}%)")
 
-    # # Store correct peptides
-    # pd.DataFrame(correct_instances).to_csv('output/correct_instances.csv', index=False)
+
+    # Store correct peptides
+    # pd.DataFrame(correct_instances).to_csv('output/correct_instances_TUM_third_pool_1_01_01_annotation.csv', index=False)
     # print(f"Saved {len(correct_instances)} correct instances")
               
 
@@ -387,7 +403,7 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
 if __name__ == "__main__":
 
     isProspect = True
-    filterCorrectPeptides = True
+    filterCorrectPeptides = False
 
 
     if isProspect:
@@ -401,7 +417,7 @@ if __name__ == "__main__":
         TOLERANCE = 0.005
         TERMINATION_TOLERANCE= 0.005
         VERBOSE = False
-        NUM_EXAMPLES = 20
+        NUM_EXAMPLES = None
 
         process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES)
 
