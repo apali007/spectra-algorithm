@@ -52,20 +52,28 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
         terminal = 'N'
     
     precursor_neutral_mass = (precursor_mz * precursor_charge) - (precursor_charge* MASS_PROTON)
-
+    
     completed_sequences = []
     completed_traces = []
+    
+    found_peptide_sequence = False
+    
     if VERBOSE:
-        print(f"candidates: ", candidates.items())
+        print(f"Final selected candidates -> Ion type: {ion_type} candidates: ", candidates.items())
 
     for start_aa, (start_residue_mass, start_mz, start_charge, start_nl, from_precursor) in candidates.items():
+        completed_sequences = []
+        completed_traces = []
         trace_lines = []
         position = 1
         sequence = [start_aa] # b1 or y1 initialized
         current_residue_sum = start_residue_mass # b1 or y1 neutral mass initialized
         current_mz = start_mz
-        # print(f"Ion Type: {ion_type} | start_candidate_AA: {start_aa}")
         trace_lines.append(f"Attempting {ion_type}-ion ladder starting with {start_aa} as the {terminal}-terminal amino acid ({ion_type}{position} = {start_mz:.5f} Da):")
+        
+        if VERBOSE:
+            print(f"Attempting {ion_type}-ion ladder starting with {start_aa} as the {terminal}-terminal amino acid ({ion_type}{position} = {start_mz:.5f} Da):")
+        
         
         # trace_lines.append(emit_trace_line(ion_type, position, start_mz, start_aa, start_residue_mass, start_charge, start_nl, from_precursor))
 
@@ -138,6 +146,7 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                         completed_sequences.append(peptide[::-1])
                         completed_traces.append('\n'.join(trace_lines))
                         last_aa_found = True
+                        found_peptide_sequence = True
                         break
                        
                 if not last_aa_found:
@@ -215,7 +224,13 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                             )
                         completed_sequences.append(peptide[::-1])
                         completed_traces.append('\n'.join(trace_lines))
+                        found_peptide_sequence = True
                         break
+                
+        if found_peptide_sequence:
+            if VERBOSE:
+                print(f"Found the peptide sequence with start_aa ({start_aa}), the sequence is {completed_sequences}.")
+            break
     
     return completed_sequences, completed_traces
 
@@ -231,41 +246,63 @@ def derive_full_sequence(mz, intensity, y1_candidates, b1_candidates, precursor_
 
 def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge, tolerance, termination_tolerance):
 
+     
+    is_y1_candidates_direct = False
+    is_b1_candidates_direct = False
+    is_y1_candidates_back_calc = True
+    is_b1_candidates_back_calc = False
+
     reasoning_trace = []
 
     # first derive y1 and b1
 
+
+    if is_y1_candidates_direct or is_b1_candidates_direct:
+        y1_candidates_direct, b1_candidates_direct = find_y1_b1_direct(mz, intensity, tolerance)
+
+    if not is_y1_candidates_direct:    
+        y1_candidates_direct = {}
+
+    if not is_b1_candidates_direct:
+        b1_candidates_direct = {}
+
+    reasoning_trace.append(emit_candidates_summary('y', y1_candidates_direct))
     
-    # y1_candidates_approach1 = {}
-    # b1_candidates_approach1 = {}
+    b1_candidates_direct = {}
 
-    y1_candidates_approach1, b1_candidates_approach1 = find_y1_b1_approach1(mz, intensity, tolerance)
+    if is_y1_candidates_back_calc or is_b1_candidates_back_calc:
+        y1_candidates_back_calc, b1_candidates_back_calc = find_y1_b1_back_calc(mz, intensity, precursor_mz, precursor_charge,tolerance)
 
-    reasoning_trace.append(emit_candidates_summary('y', y1_candidates_approach1))
-    
-    b1_candidates_approach1 = {}
+    if not is_y1_candidates_back_calc:    
+        y1_candidates_back_calc = {}
 
-    # y1_candidates_approach2, b1_candidates_approach2 = find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge,tolerance)
-
-    y1_candidates_approach2 = {}
-    b1_candidates_approach2 = {}
+    if not is_b1_candidates_back_calc:
+        b1_candidates_back_calc = {}
 
 
     if VERBOSE:
-        print(f"\nPeptide: {label_peptide}")
-    # print(f" Approach  1 - y1: {y1_candidates_approach1} | b1: {b1_candidates_approach1}")
-    # print(f" Approach  2 - y1: {y1_candidates_approach2} | b1: {b1_candidates_approach2}")
+        print(f"\nLabel Peptide: {label_peptide}")
+        print(f" Direct Approach - y1: {y1_candidates_direct} | b1: {b1_candidates_direct}")
+        print(f" Back calc Approach - y1: {y1_candidates_back_calc} | b1: {b1_candidates_back_calc}")
 
     true_y1_aa = label_peptide[-1]
     true_b1_aa = label_peptide[0]
     # print(f" Expected y1: {true_y1_aa} |  Expected b1: {true_b1_aa}")
 
-    y1_candidates = {**y1_candidates_approach1, **y1_candidates_approach2}
-    b1_candidates = {**b1_candidates_approach1, **b1_candidates_approach2}
-    
-    if VERBOSE:
-        print(f"y1_candidates: {y1_candidates}")
-        print(f"b1_candidates: {b1_candidates}")
+    # Prioritize direct approach over back calc approach. If the AA are same, the direct approach AA is picked.
+    y1_candidates = dict(y1_candidates_direct)
+    for aa, val in y1_candidates_back_calc.items():
+        if aa not in y1_candidates:
+            y1_candidates[aa] = val
+
+    b1_candidates = dict(b1_candidates_direct)
+    for aa, val in b1_candidates_back_calc.items():
+        if aa not in b1_candidates:
+            b1_candidates[aa] = val
+
+    # if VERBOSE:
+    #     print(f"y1_candidates: {y1_candidates}")
+    #     print(f"b1_candidates: {b1_candidates}")
 
     y_sequences, y_traces, b_sequences, b_traces = derive_full_sequence(
         mz, intensity, y1_candidates, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance
@@ -276,10 +313,10 @@ def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge,
     # print(f"y_sequences: {y_sequences}")
     # print(f"b_sequences: {b_sequences}")
     
-    if VERBOSE:
-        print(f"Reasoning trace")
-        print(complete_resoning_trace)
-        print("==============")
+    # if VERBOSE:
+        # print(f"Reasoning trace")
+        # print(complete_resoning_trace)
+        # print("==============")
 
     return y_sequences, b_sequences, complete_resoning_trace
     
@@ -291,7 +328,7 @@ def filter_top_peaks(mz, intensity, top_n):
 
     return mz_array[top_indices].tolist()
 
-def find_y1_b1_approach1(mz, intensity, tolerance):
+def find_y1_b1_direct(mz, intensity, tolerance):
     y1_candidates = {}
     b1_candidates = {}
 
@@ -322,7 +359,7 @@ def find_y1_b1_approach1(mz, intensity, tolerance):
 
     return y1_candidates, b1_candidates
 
-def find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge, tolerance):
+def find_y1_b1_back_calc(mz, intensity, precursor_mz, precursor_charge, tolerance):
     y1_candidates = {}
     b1_candidates = {}
 
@@ -350,22 +387,26 @@ def find_y1_b1_approach2(mz, intensity, precursor_mz, precursor_charge, toleranc
         # y1 and b1 ions are singly charged
         y1_expected = mass + MASS_H2O
         b1_expected = mass
-        for experimental_mz in large_mz:
+        for large_experimental_mz in large_mz:
             for charge in range(1, precursor_charge+1):
 
-                experimental_mz_neutral = experimental_mz * charge - (charge * MASS_PROTON)  
+                large_experimental_mz_neutral = large_experimental_mz * charge - (charge * MASS_PROTON)  
                 for nl_mass in [0, MASS_NH3, MASS_H2O]:
-                    recovered_experimental_mz_mass = experimental_mz_neutral + nl_mass
+                    recovered_large_experimental_mz_mass = large_experimental_mz_neutral + nl_mass
                     #make singly charged
-                    recovered_experimental_mz_mass_singly = recovered_experimental_mz_mass + MASS_PROTON
+                    recovered_large_experimental_mz_mass_singly = recovered_large_experimental_mz_mass + MASS_PROTON
                  
-                    derived_AA = precursor_neutral_mass_singly - recovered_experimental_mz_mass_singly
+                    derived_AA = precursor_neutral_mass_singly - recovered_large_experimental_mz_mass_singly
+
+                    # derived_AA does not exist in the input raw mz, so we have to create it as charge = 1. 
+                    y1_expected_singly_charged = y1_expected + MASS_PROTON
+                    b1_expected_singly_charged = b1_expected + MASS_PROTON
 
                     if abs(derived_AA - y1_expected) <=tolerance:
-                        y1_candidates[aa] = (derived_AA - MASS_H2O, experimental_mz, charge, nl_mass, True)
+                        y1_candidates[aa] = (derived_AA - MASS_H2O, y1_expected_singly_charged, charge, nl_mass, True)
 
                     if abs(derived_AA - b1_expected) <=tolerance:
-                        b1_candidates[aa] = (derived_AA, experimental_mz, charge, nl_mass, True)
+                        b1_candidates[aa] = (derived_AA, b1_expected_singly_charged, charge, nl_mass, True)
 
     return y1_candidates, b1_candidates
 
@@ -469,8 +510,8 @@ def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, m
         if scan_annot.empty:
             continue
 
-        # mz_list = scan_annot['experimental_mass'].tolist()
-        mz_list = scan_annot['theoretical_mass'].tolist()
+        mz_list = scan_annot['experimental_mass'].tolist()
+        # mz_list = scan_annot['theoretical_mass'].tolist()
 
         spectra.append({
             'peptide' : row['modified_sequence'],
@@ -484,7 +525,7 @@ def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, m
 
     return spectra
 
-def process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance, termination_tolerance, num_examples):
+def process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance, termination_tolerance, num_examples, save_dataset):
     spectra = load_prospect(annotation_data_path, meta_data_path, correct_instances_path, num_examples)
 
     total = 0
@@ -518,8 +559,18 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
         y_match = any(normalize(s) == true_y for s in y_seqs)
         b_match = any(normalize(s) == true_b for s in b_seqs)
 
-        if y_match: y_correct +=1
-        if b_match: b_correct +=1
+        if y_match:
+            y_correct +=1
+            if VERBOSE:
+                print(f"Correct y_sequence match")
+                print(f"scan number: {spec['scan_number']}")
+                print(f"raw file: {spec['raw_file']}")
+        
+        if b_match:
+            b_correct +=1
+            if VERBOSE:
+                print(f"Correct b_sequence match")
+
         if y_match and b_match: both_correct += 1
         if y_match or b_match: y_or_b_correct+= 1
         # if y_match or b_match:
@@ -529,7 +580,8 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
         #         'peptide':peptide
         #     })
 
-        dataset.append({
+        if save_dataset:
+            dataset.append({
             'input': spectrum_to_input_text(spec['mz'], spec['precursor_mz'], spec['precursor_charge']),
             'output': reasoning_trace,
             'peptide': peptide,
@@ -538,11 +590,11 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
             'y_b_match': y_match or b_match
             })
         
-        # Store correct peptides
-        if total % 1000 == 0:
-            with open('output/reasoning_dataset_2000.json', 'w') as f:
-                json.dump(dataset, f, indent=2)
-            print(f"Progress: {total} processed, {y_or_b_correct} correct so for")
+            # Store correct peptides
+            if total % 1000 == 0:
+                with open('output/reasoning_dataset_2000.json', 'w') as f:
+                    json.dump(dataset, f, indent=2)
+                print(f"Progress: {total} processed, {y_or_b_correct} correct so for")
 
     print("Results:")
     print(f"Total: {total}")
@@ -550,22 +602,23 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
     print(f"B correct: {b_correct} ({100*b_correct/total:.1f}%)")
     print(f"Both correct: {both_correct} ({100*both_correct/total:.1f}%)")
     print(f"Y or B correct: {y_or_b_correct} ({100*y_or_b_correct/total:.1f}%)")
-    print(f"Dataset size: {len(dataset)}")
 
-    with open('output/reasoning_dataset_2000.json', 'w') as f:
-        json.dump(dataset, f, indent=2)
-    print(f"Saved {len(dataset)} training examples to output/reasoning_dataset_2000.json")
-    # # Store correct peptides
-    # pd.DataFrame(correct_instances).to_csv('output/correct_instances.csv', index=False)
-    # print(f"Saved {len(correct_instances)} correct instances")
+    if save_dataset:
+        print(f"Dataset size: {len(dataset)}")
+
+        with open('output/reasoning_dataset_2000.json', 'w') as f:
+            json.dump(dataset, f, indent=2)
+        print(f"Saved {len(dataset)} training examples to output/reasoning_dataset_2000.json")
+        # # Store correct peptides
+        # pd.DataFrame(correct_instances).to_csv('output/correct_instances.csv', index=False)
+        # print(f"Saved {len(correct_instances)} correct instances")
               
 
 
 if __name__ == "__main__":
 
     isProspect = True
-    filterCorrectPeptides = True
-
+    filterCorrectPeptides = False
 
     if isProspect:
         if filterCorrectPeptides:
@@ -577,11 +630,12 @@ if __name__ == "__main__":
         OUTPUT_PATH = ""
         TOLERANCE = 0.005
         TERMINATION_TOLERANCE= 0.005
-        VERBOSE = False
-        NUM_EXAMPLES = 2000
+        VERBOSE = True
+        NUM_EXAMPLES = 100
+        SAVE_DATASET = False
         # NUM_EXAMPLES = 7317
 
-        process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES)
+        process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES, save_dataset = SAVE_DATASET)
 
     else:
         MGF_PATH = "/disk/raptor-array/SaeedLab-Data/Mass-Spec/SpectralLibraries/Massive-KB-v1/LIBRARY_CREATION_AUGMENT_LIBRARY_TEST-82c0124b-download_filtered_mgf_library-main.mgf"
