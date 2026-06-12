@@ -28,21 +28,32 @@ import pandas as pd
 
 import json
 
-input_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317.json"
-output_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317_positive.json"
+# input_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317.json"
+# output_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317_positive.json"
 
-with open(input_path, 'r') as f:
+# with open(input_path, 'r') as f:
+#     data = json.load(f)
+
+# positive = []
+# for item in data:
+#     if item.get('y_b_match')==True:
+#         item['y_match'] = item.pop('y_b_match')
+#         positive.append(item)
+        
+# with open(output_path, 'w') as f:
+#     json.dump(positive, f, indent=2)
+
+# print(f"Total: {len(data)}")
+# print(f"Positive: {len(positive)}")
+# print(f"Saved to {output_path}")
+
+import json
+from collections import Counter
+
+with open('/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_6942_positive.json') as f:
     data = json.load(f)
 
-positive = []
-for item in data:
-    if item.get('y_b_match')==True:
-        item['y_match'] = item.pop('y_b_match')
-        positive.append(item)
-        
-with open(output_path, 'w') as f:
-    json.dump(positive, f, indent=2)
+peptides = Counter(entry['peptide'] for entry in data)
 
-print(f"Total: {len(data)}")
-print(f"Positive: {len(positive)}")
-print(f"Saved to {output_path}")
+print(f'Total entries: {len(data)}')
+print(f'Unique peptides: {len(peptides)}')
