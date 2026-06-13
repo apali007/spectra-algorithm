@@ -17,6 +17,40 @@ MASS_NH3 = 17.02655
 MASS_PROTON =  1.00728
 MASS_C13    = 1.00335 # Mass Difference between C-12 and C-13
 
+
+def derive_peptide_from_incomplete_peptide( y_sequences, y_residue_sum,b_sequences, b_residue_sum, precursor_mz, precursor_charge, termination_tolerance):
+    precursor_neutral_mass = (precursor_mz * precursor_charge) - (precursor_charge* MASS_PROTON)
+
+    combined_residue_sum = y_residue_sum + b_residue_sum
+    if abs(combined_residue_sum + MASS_H2O - precursor_neutral_mass) <= termination_tolerance:
+        combined_sequence = b_sequences + y_sequences
+        if VERBOSE:
+            print(f"Merged without overlap or filling the gap. Combined sequence: {combined_sequence}")
+        return [combined_sequence]
+
+    if combined_residue_sum < precursor_neutral_mass - MASS_H2O:
+        gap = precursor_neutral_mass - MASS_H2O - combined_residue_sum
+        for aa, mass in AA_MASSES.items():
+            if abs(gap - mass) <= termination_tolerance:
+                combined_sequence = b_sequences + aa + y_sequences
+                if VERBOSE:
+                    print(f"Gap filled with {aa} ({mass:.5f} Da). Combined sequence: {combined_sequence}")
+                return [combined_sequence]
+
+    elif combined_residue_sum > precursor_neutral_mass - MASS_H2O:
+        for i in range(1, len(b_sequences)):
+            for j in range(1, len(y_sequences)):
+                b_prefix = b_sequences[:i]
+                y_suffix = y_sequences[-j:]
+                b_prefix_mass = sum(AA_MASSES.get(aa, 0) for aa in b_prefix)
+                y_suffix_mass = sum(AA_MASSES.get(aa, 0) for aa in y_suffix)
+                if abs(b_prefix_mass + y_suffix_mass + MASS_H2O - precursor_neutral_mass) <= termination_tolerance:
+                    combined_sequence = b_prefix + y_suffix
+                    if VERBOSE:
+                        print(f"Overlap resolved. Combined sequence: {combined_sequence}")
+                    return [combined_sequence]
+    return []
+
 def emit_candidates_summary(ion_type, candidates):
     ion_label = "y1" if ion_type == 'y' else "b1"
 
@@ -55,11 +89,14 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
     
     completed_sequences = []
     completed_traces = []
+
+    incomplete_peptide_sequence = ""
+    incomplete_peptide_residue_sum = 0
     
     found_peptide_sequence = False
     
     if VERBOSE:
-        print(f"Final selected candidates -> Ion type: {ion_type} candidates: ", candidates.items())
+        print(f"Final selected {ion_type}1 candidates -> Ion type: {ion_type} candidates: ", candidates.items())
 
     for start_aa, (start_residue_mass, start_mz, start_charge, start_nl, from_precursor) in candidates.items():
         completed_sequences = []
@@ -80,6 +117,14 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
         while True:
             #overshot pre cursor mass
             if (precursor_neutral_mass - current_residue_sum - MASS_H2O) < 0:
+                incomplete_pep = ''.join(sequence)
+                if is_y:
+                        incomplete_pep = incomplete_pep[::-1]
+                if VERBOSE:
+                    print(f"overshot pre cursor mass for {ion_type} ion ladder. Residue sum: {current_residue_sum}. Incomplete sequence: {incomplete_pep}.")
+                if current_residue_sum > incomplete_peptide_residue_sum:
+                    incomplete_peptide_residue_sum = current_residue_sum
+                    incomplete_peptide_sequence = incomplete_pep
                 trace_lines.append(
                     f"No peak found for {ion_type}{position+1}. "
                     f"{ion_type} ladder terminated at position {ion_type}{position}. "
@@ -143,20 +188,35 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                                 f"The complete sequence is predicted as {peptide[::-1]}."
                             )
 
-                        completed_sequences.append(peptide[::-1])
+                        if is_y:
+                            completed_sequences.append(peptide[::-1])
+                        else:
+                            completed_sequences.append(peptide)
+
                         completed_traces.append('\n'.join(trace_lines))
                         last_aa_found = True
                         found_peptide_sequence = True
+                        if VERBOSE:
+                            print(f"Complete sequence is predicted, using precursor mass for the last AA for {ion_type} ion ladder.")
                         break
                        
                 if not last_aa_found:
                     #  print(f"[{ion_type}] Dead end at: {''.join(sequence)}")
-                     trace_lines.append(
+                    incomplete_pep = ''.join(sequence)
+                    if is_y:
+                        incomplete_pep = incomplete_pep[::-1]
+                    if VERBOSE:
+                        print(f"Ambiguity: No peak found for {ion_type}{position+1}. Residue sum: {current_residue_sum}. Incomplete sequence: {incomplete_pep}")
+                    if current_residue_sum > incomplete_peptide_residue_sum:
+                        incomplete_peptide_residue_sum = current_residue_sum
+                        incomplete_peptide_sequence = incomplete_pep
+                        
+                    trace_lines.append(
                         f"No peak found for {ion_type}{position+1}. "
                         f"{ion_type} ladder terminated at position {ion_type}{position}. "
                         f"Unable to derive the peptide sequence from this spectrum."
-                     )
-                     completed_traces.append('\n'.join(trace_lines))
+                    )
+                    completed_traces.append('\n'.join(trace_lines))
                 break
 
             elif len(unique_aa_hits) > 1:
@@ -193,6 +253,16 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                     f"{ion_type} ladder terminated at position {ion_type}{position}. "
                     f"Unable to derive the peptide sequence from this spectrum."
                 )
+                
+                incomplete_pep = ''.join(sequence)
+                if is_y:
+                    incomplete_pep = incomplete_pep[::-1]
+                if VERBOSE:
+                    print(f"Ambiguity: Mutiple candidates found for {ion_type}{position+1}. Residue sum: {current_residue_sum}. Incomplete sequence: {incomplete_pep}")
+                if current_residue_sum > incomplete_peptide_residue_sum:
+                    incomplete_peptide_residue_sum = current_residue_sum
+                    incomplete_peptide_sequence = incomplete_pep
+                        
                 completed_traces.append('\n'.join(trace_lines))
                 break
             else:
@@ -222,41 +292,38 @@ def extend_ladder(ion_type, mz, intensity, candidates, precursor_mz, precursor_c
                         trace_lines.append(
                                 f"The complete sequence is predicted as {peptide[::-1]}."
                             )
-                        completed_sequences.append(peptide[::-1])
+                        if is_y:
+                            completed_sequences.append(peptide[::-1])
+                        else:
+                            completed_sequences.append(peptide)
                         completed_traces.append('\n'.join(trace_lines))
                         found_peptide_sequence = True
+
+                        if VERBOSE:
+                            print(f"Complete sequence predicted as residue sum matches with the precursor mass for {ion_type} ion ladder.")
                         break
                 
         if found_peptide_sequence:
             if VERBOSE:
-                print(f"Found the peptide sequence with start_aa ({start_aa}), the sequence is {completed_sequences}.")
+                print(f"Found the peptide sequence for {ion_type} ion ladder with start_aa ({start_aa}), the sequence is {completed_sequences}.")
             break
     
-    return completed_sequences, completed_traces
+    if found_peptide_sequence:
+        return completed_sequences, completed_traces, current_residue_sum
+    else:
+        return [incomplete_peptide_sequence], [], incomplete_peptide_residue_sum
 
-
-def derive_full_sequence(mz, intensity, y1_candidates, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance):
-    y_sequences, y_traces = extend_ladder('y', mz, intensity, y1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance)
-    # b_sequences, b_traces = extend_ladder('b', mz, intensity, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance)
-    b_sequences = {}
-    b_traces = []
-    
-
-    return y_sequences, y_traces, b_sequences, b_traces
 
 def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge, tolerance, termination_tolerance):
 
-     
-    is_y1_candidates_direct = False
-    is_b1_candidates_direct = False
+    is_y1_candidates_direct = True
+    is_b1_candidates_direct = True
     is_y1_candidates_back_calc = True
-    is_b1_candidates_back_calc = False
+    is_b1_candidates_back_calc = True
 
     reasoning_trace = []
 
     # first derive y1 and b1
-
-
     if is_y1_candidates_direct or is_b1_candidates_direct:
         y1_candidates_direct, b1_candidates_direct = find_y1_b1_direct(mz, intensity, tolerance)
 
@@ -267,8 +334,6 @@ def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge,
         b1_candidates_direct = {}
 
     reasoning_trace.append(emit_candidates_summary('y', y1_candidates_direct))
-    
-    b1_candidates_direct = {}
 
     if is_y1_candidates_back_calc or is_b1_candidates_back_calc:
         y1_candidates_back_calc, b1_candidates_back_calc = find_y1_b1_back_calc(mz, intensity, precursor_mz, precursor_charge,tolerance)
@@ -281,13 +346,12 @@ def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge,
 
 
     if VERBOSE:
+        precursor_neutral_mass = (precursor_mz * precursor_charge) - (precursor_charge* MASS_PROTON)
         print(f"\nLabel Peptide: {label_peptide}")
+        print(f"Precursor neutral mass: {precursor_neutral_mass}")
         print(f" Direct Approach - y1: {y1_candidates_direct} | b1: {b1_candidates_direct}")
         print(f" Back calc Approach - y1: {y1_candidates_back_calc} | b1: {b1_candidates_back_calc}")
 
-    true_y1_aa = label_peptide[-1]
-    true_b1_aa = label_peptide[0]
-    # print(f" Expected y1: {true_y1_aa} |  Expected b1: {true_b1_aa}")
 
     # Prioritize direct approach over back calc approach. If the AA are same, the direct approach AA is picked.
     y1_candidates = dict(y1_candidates_direct)
@@ -300,25 +364,33 @@ def derive_peptide(mz, intensity, label_peptide, precursor_mz, precursor_charge,
         if aa not in b1_candidates:
             b1_candidates[aa] = val
 
-    # if VERBOSE:
-    #     print(f"y1_candidates: {y1_candidates}")
-    #     print(f"b1_candidates: {b1_candidates}")
+    y_match = False
+    b_match = False
+    merged_match = False
 
-    y_sequences, y_traces, b_sequences, b_traces = derive_full_sequence(
-        mz, intensity, y1_candidates, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance
-        )
-    
+    y_sequences, y_traces, y_residue_sum = extend_ladder('y', mz, intensity, y1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance)
+
+    normalized_label_peptide = normalize(label_peptide)
+    y_match = any(normalize(s) == normalized_label_peptide for s in y_sequences)
+
     reasoning_trace.append('\n'.join(y_traces))
     complete_resoning_trace = '\n'.join(reasoning_trace)
-    # print(f"y_sequences: {y_sequences}")
-    # print(f"b_sequences: {b_sequences}")
-    
-    # if VERBOSE:
-        # print(f"Reasoning trace")
-        # print(complete_resoning_trace)
-        # print("==============")
 
-    return y_sequences, b_sequences, complete_resoning_trace
+    if y_match:
+            return y_match, b_match, merged_match, complete_resoning_trace
+    
+    b_sequences, b_traces, b_residue_sum = extend_ladder('b', mz, intensity, b1_candidates, precursor_mz, precursor_charge, tolerance, termination_tolerance) 
+    b_match = any(normalize(s) == normalized_label_peptide for s in b_sequences)
+        
+    if b_match:
+        return y_match, b_match, merged_match, complete_resoning_trace
+    if y_sequences[0] and b_sequences[0]:
+        merged_sequence = derive_peptide_from_incomplete_peptide( y_sequences[0], y_residue_sum,b_sequences[0], b_residue_sum, precursor_mz, precursor_charge, termination_tolerance)
+    else:
+        merged_sequence = []
+    merged_match = any(normalize(s) == normalized_label_peptide for s in merged_sequence)
+    return y_match, b_match, merged_match, complete_resoning_trace
+
     
 def filter_top_peaks(mz, intensity, top_n):
     mz_array = np.array(mz)
@@ -525,28 +597,27 @@ def load_prospect(annotation_data_path, meta_data_path,correct_instances_path, m
 
     return spectra
 
+def normalize(s):
+    return s.replace('I', 'L')
+
 def process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance, termination_tolerance, num_examples, save_dataset):
     spectra = load_prospect(annotation_data_path, meta_data_path, correct_instances_path, num_examples)
 
     total = 0
     y_correct = 0
     b_correct = 0
-    both_correct = 0
-    y_or_b_correct = 0
+    merged_correct = 0
+    y_b_merged_correct = 0
     # correct_instances = []
     dataset = []
 
-    def normalize(s):
-        return s.replace('I', 'L')
+ 
 
     for spec in spectra:
         total += 1
         peptide = spec['peptide']
-        true_y = normalize(peptide)
-        true_b = normalize(peptide)
 
-
-        y_seqs, b_seqs, reasoning_trace = derive_peptide(
+        y_match, b_match, merged_match, reasoning_trace = derive_peptide(
             spec['mz'],
             spec['intensity'],
             spec['peptide'],
@@ -555,9 +626,6 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
             tolerance,
             termination_tolerance
         )
-
-        y_match = any(normalize(s) == true_y for s in y_seqs)
-        b_match = any(normalize(s) == true_b for s in b_seqs)
 
         if y_match:
             y_correct +=1
@@ -570,15 +638,20 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
             b_correct +=1
             if VERBOSE:
                 print(f"Correct b_sequence match")
+                print(f"scan number: {spec['scan_number']}")
+                print(f"raw file: {spec['raw_file']}")
 
-        if y_match and b_match: both_correct += 1
-        if y_match or b_match: y_or_b_correct+= 1
-        # if y_match or b_match:
-        #     correct_instances.append({
-        #         'scan_number': spec['scan_number'],
-        #         'raw_file':spec['raw_file'],
-        #         'peptide':peptide
-        #     })
+        if merged_match:
+            merged_correct +=1
+            if VERBOSE:
+                print(f"Correct merge_sequence match")
+                print(f"scan number: {spec['scan_number']}")
+                print(f"raw file: {spec['raw_file']}")
+
+        if y_match or b_match or merged_match: 
+            if VERBOSE:
+                print(f"y or b or merged sequence match are correct")
+            y_b_merged_correct += 1
 
         if save_dataset:
             dataset.append({
@@ -594,14 +667,14 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
             if total % 1000 == 0:
                 with open('output/reasoning_dataset_2000.json', 'w') as f:
                     json.dump(dataset, f, indent=2)
-                print(f"Progress: {total} processed, {y_or_b_correct} correct so for")
+                print(f"Progress: {total} processed, {y_b_merged_correct} correct so for")
 
     print("Results:")
     print(f"Total: {total}")
     print(f"Y correct: {y_correct} ({100*y_correct/total:.1f}%)")
     print(f"B correct: {b_correct} ({100*b_correct/total:.1f}%)")
-    print(f"Both correct: {both_correct} ({100*both_correct/total:.1f}%)")
-    print(f"Y or B correct: {y_or_b_correct} ({100*y_or_b_correct/total:.1f}%)")
+    print(f"Merged seqs correct: {merged_correct} ({100*merged_correct/total:.1f}%)")
+    print(f"Y or B or merged seqs are correct: {y_b_merged_correct} ({100*y_b_merged_correct/total:.1f}%)")
 
     if save_dataset:
         print(f"Dataset size: {len(dataset)}")
@@ -609,11 +682,6 @@ def process_prospect(annotation_data_path, meta_data_path, correct_instances_pat
         with open('output/reasoning_dataset_2000.json', 'w') as f:
             json.dump(dataset, f, indent=2)
         print(f"Saved {len(dataset)} training examples to output/reasoning_dataset_2000.json")
-        # # Store correct peptides
-        # pd.DataFrame(correct_instances).to_csv('output/correct_instances.csv', index=False)
-        # print(f"Saved {len(correct_instances)} correct instances")
-              
-
 
 if __name__ == "__main__":
 
@@ -629,11 +697,10 @@ if __name__ == "__main__":
         meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
         OUTPUT_PATH = ""
         TOLERANCE = 0.005
-        TERMINATION_TOLERANCE= 0.005
+        TERMINATION_TOLERANCE= 0.01
         VERBOSE = True
-        NUM_EXAMPLES = 100
         SAVE_DATASET = False
-        # NUM_EXAMPLES = 7317
+        NUM_EXAMPLES = 100
 
         process_prospect(annotation_data_path, meta_data_path, correct_instances_path, tolerance=TOLERANCE, termination_tolerance=TERMINATION_TOLERANCE, num_examples=NUM_EXAMPLES, save_dataset = SAVE_DATASET)
 
