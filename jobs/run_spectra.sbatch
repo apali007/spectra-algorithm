@@ -11,4 +11,6 @@ source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
 conda activate spectra
 
 cd ~/projects/spectra_algorithm
-python scripts/bottom_up_spectra_algorithm_reasoning_dataset_v2.py
+# python scripts/bottom_up_spectra_algorithm_reasoning_dataset_v2.py
+
+python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v2/input_data/train_test_split.py

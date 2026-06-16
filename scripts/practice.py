@@ -11,7 +11,7 @@
 #     mgfoutput(MGF_PATH)
     
 
-import pandas as pd
+# import pandas as pd
 # meta = pd.read_parquet('/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet')
 # print('Total rows: ', len(meta))
 # print('Unique peptides: ', meta['modified_sequence'].nunique())
@@ -26,7 +26,7 @@ import pandas as pd
 # print("Total annotation rows: ", len(annot_data))
 
 
-import json
+# import json
 
 # input_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317.json"
 # output_path = "/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_7317_positive.json"
@@ -47,13 +47,42 @@ import json
 # print(f"Positive: {len(positive)}")
 # print(f"Saved to {output_path}")
 
-import json
+# import json
+# from collections import Counter
+
+# with open('/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_6942_positive.json') as f:
+#     data = json.load(f)
+
+# peptides = Counter(entry['peptide'] for entry in data)
+
+# print(f'Total entries: {len(data)}')
+# print(f'Unique peptides: {len(peptides)}')
+
+import re
+import pandas as pd
 from collections import Counter
 
-with open('/lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_6942_positive.json') as f:
-    data = json.load(f)
+AA_MASSES = {
+    'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
+    'C': 103.00919, 'E': 129.04259, 'Q': 128.05858, 'G': 57.02146,
+    'H': 137.05891, 'I': 113.08406, 'L': 113.08406, 'K': 128.09496,
+    'M': 131.04049, 'F': 147.06841, 'P': 97.05276,  'S': 87.03203,
+    'T': 101.04768, 'W': 186.07931, 'Y': 163.06333, 'V': 99.06841,
+}
 
-peptides = Counter(entry['peptide'] for entry in data)
+def is_valid_peptide(peptide):
+    return bool(peptide) and bool(re.fullmatch(r'[A-Z]+', peptide)) and all(aa in AA_MASSES for aa in peptide)
 
-print(f'Total entries: {len(data)}')
-print(f'Unique peptides: {len(peptides)}')
+meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
+
+meta_data = pd.read_parquet(meta_data_path)
+
+meta_data = meta_data[meta_data['modified_sequence'].apply(is_valid_peptide)]
+
+peptide_counts = Counter(meta_data['modified_sequence'].tolist())
+
+print(f"Total spectra: {len(meta_data)}")
+print(f"Unique peptides: {len(peptide_counts)}")
+print()
+for peptide, count in peptide_counts.most_common():
+    print(f"{peptide}: {count}")
