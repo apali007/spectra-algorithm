@@ -40,8 +40,28 @@ LEARNING_RATE = 2e-4
 # Warmup gradually increases the learning rate at the start of training to stabalize it.
 WARMUP_RATIO = 0.05
 
+
+
+
+# NO PEPTIDE OVERLAP IN TRAIN AND TEST
+# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_train.json"
+# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_test.json"
+
 # During training, the model weights change every step. A checkpoint is a snapshot of the model at a specific training, saved to disk so you dont lose progress.
-OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4"
+# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4"
+
+# 10% PEPTIDE OVERLAP IN TRAIN AND TEST
+# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_train.json"
+# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json"
+
+# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP"
+
+# 20% PEPTIDE OVERLAP IN TRAIN AND TEST
+TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_train.json"
+TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_test.json"
+
+OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP"
+
 
 # Takes the path from JSONL/input file and the tokenizer. Returns formatted train and test datasets
 def load_and_format(tokenizer):
@@ -74,8 +94,8 @@ def load_and_format(tokenizer):
             )
         }
 
-    train_raw = load_dataset("json", data_files = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_train.json", split="train")
-    test_raw = load_dataset("json", data_files = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_test.json", split="train")
+    train_raw = load_dataset("json", data_files = TRAIN_SET_DIR, split="train")
+    test_raw = load_dataset("json", data_files = TEST_SET_DIR, split="train")
 
     train_formatted = train_raw.map(_format, remove_columns=train_raw.column_names)
     test_formatted = test_raw.map(_format, remove_columns=test_raw.column_names)

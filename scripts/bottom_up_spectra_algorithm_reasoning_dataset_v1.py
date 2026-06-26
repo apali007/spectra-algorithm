@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import os
 
+# monoisotopic mass 
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
     'C': 103.00919, 'E': 129.04259, 'Q': 128.05858, 'G': 57.02146,

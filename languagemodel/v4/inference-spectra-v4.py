@@ -3,8 +3,13 @@ import json
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 import re
+import os
 
-MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
+# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
+MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP/merged_16bit/"
+# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP/merged_16bit/"
+
+
 MAX_SEQ_LENGTH = 4096
 MAX_NEW_TOKENS = 2048
 TEMPERATURE = 0.1
@@ -141,9 +146,16 @@ def predict_from_single_spectrum(model, tokenizer, spectrum_input):
     
 
 
-def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_examples):
+def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_examples, is_resume):
      
     results = []
+    if is_resume:
+        processed_ids = set()
+        if output_path and os.path.exists(output_path):
+            with open(output_path, 'r') as f:
+                results = json.load(f)
+            processed_ids = {item['spectra_id'] for item in results}
+            print(f"Resuming: {len(processed_ids)} already processed")
 
     with open(input_batch_path, 'r') as f:
 
@@ -153,6 +165,11 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
     
             if num_examples is not None and i > num_examples:
                 break
+
+            if is_resume:
+                if i in processed_ids:
+                    print(f"Skipping spectrum {i} (already done).")
+                    continue
             
             print(f"Processing spectrum {i} ...")
 
@@ -229,8 +246,9 @@ def main():
 
     if args.batch:
         num_examples = None
+        is_resume = True
 
-        predict_from_batch(model, tokenizer, args.batch, args.output, num_examples)
+        predict_from_batch(model, tokenizer, args.batch, args.output, num_examples, is_resume)
     
     elif args.text:
         
