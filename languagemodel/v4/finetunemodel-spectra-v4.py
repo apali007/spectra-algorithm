@@ -51,16 +51,16 @@ WARMUP_RATIO = 0.05
 # OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4"
 
 # 10% PEPTIDE OVERLAP IN TRAIN AND TEST
-# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_train.json"
-# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json"
+TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_train.json"
+TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json"
 
-# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP"
+OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP"
 
 # 20% PEPTIDE OVERLAP IN TRAIN AND TEST
-TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_train.json"
-TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_test.json"
+# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_train.json"
+# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_test.json"
 
-OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP"
+# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP"
 
 
 # Takes the path from JSONL/input file and the tokenizer. Returns formatted train and test datasets

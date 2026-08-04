@@ -5,8 +5,8 @@ from unsloth.chat_templates import get_chat_template
 import re
 import os
 
-# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
-MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP/merged_16bit/"
+MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
+# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP/merged_16bit/"
 # MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP/merged_16bit/"
 
 
@@ -246,7 +246,7 @@ def main():
 
     if args.batch:
         num_examples = None
-        is_resume = True
+        is_resume = False
 
         predict_from_batch(model, tokenizer, args.batch, args.output, num_examples, is_resume)
     

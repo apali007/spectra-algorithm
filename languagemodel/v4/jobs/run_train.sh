@@ -10,10 +10,15 @@
 source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
 conda activate spectra
 
+export HF_HOME=/disk/dragon-storage/homes/apali007/.cache/huggingface
+
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 
 # python finetunemodel-spectra.py --data /lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_correct_instances_TUM_third_pool_1_01_01_annotation.json --epochs 1
 
-python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/finetunemodel-spectra-v4.py --epochs 1
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/finetunemodel-spectra-v4.py --epochs 1
+
+# merging LORA weights and full weights of QWEN instruct model
+python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/merge_only.py
 
 

@@ -9,10 +9,8 @@
 
 source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
 conda activate spectra
+export LD_LIBRARY_PATH=/lclhome/apali007/miniconda3/envs/spectra/lib:$LD_LIBRARY_PATH
 
 cd ~/projects/spectra_algorithm
-# python scripts/bottom_up_spectra_algorithm_reasoning_dataset_v2.py
-
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-reasoning-corpus.py
-
+echo "Running on node: $(hostname)"
 python scripts/practice.py
