@@ -2,6 +2,7 @@ import json
 import re
 import numpy as np
 import pandas as pd
+import glob
 
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
@@ -10,12 +11,6 @@ AA_MASSES = {
     'M': 131.04049, 'F': 147.06841, 'P': 97.05276,  'S': 87.03203,
     'T': 101.04768, 'W': 186.07931, 'Y': 163.06333, 'V': 99.06841,
 }
-
-# 
-131.04049 + 115.02694 + 113.08406 + 129.04259 + 87.03203 + 128.05858 + 1.00728
-
-
-MDLESQISDMR
 
 NEUTRAL_LOSS_MASSES = {
     'H2O': 18.01056,
@@ -79,8 +74,6 @@ def handle_charge_nl(ion_type, mz, charge, nl, i):
         final_mass = mz
     
     return traces, final_mass
-
-    
 
 def handle_first_position(mz, ion_type, ladder_residues, tolerance):
     if ion_type == 'y':
@@ -158,11 +151,6 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_mz, prec
 
 def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charge, tolerance):
 
-    if VERBOSE:
-        print(f"\n=====NEW PEPTIDE=====")
-        print(f"Label Peptide: {label_peptide}")
-        print(f"Tolerance: {tolerance}")
-
     reasoning_trace = []
     annotation_lookup = build_annotation_lookup(annotation_rows)
 
@@ -209,11 +197,11 @@ def filter_top_peaks(mz, intensity, top_n):
     return mz_array[top_indices].tolist()
 
 def spectrum_to_input_text(mz_list, intensity_list, precursor_mz, precursor_charge):
-    #  unique_peaks = sorted(set(zip(mz_list, intensity_list)), key=lambda p: p[0])
-    peaks = sorted(zip(mz_list, intensity_list), key=lambda p: p[0])
+    unique_peaks = sorted(set(zip(mz_list, intensity_list)), key=lambda p: p[0])
+    # peaks = sorted(zip(mz_list, intensity_list), key=lambda p: p[0])
     lines = [f"Precursor mz: {precursor_mz:.5f} Da, Precursor Charge: {precursor_charge}"]
     lines += ["Experimental MS/MS spectrum (m/z, intensity):"]
-    lines += [f"m/z {mz:.5f}, intensity {intensity:.5f}" for mz, intensity in peaks]
+    lines += [f"m/z {mz:.5f}, intensity {intensity:.5f}" for mz, intensity in unique_peaks]
     lines.append("Analyze this spectrum and identify the most likely peptide sequence.")
     return "\n".join(lines)
 
@@ -288,9 +276,47 @@ def build_annotation_lookup(annotation_rows):
 def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
 
     meta_data = pd.read_parquet(meta_data_path)
-    annot_data = pd.read_parquet(annotation_data_path)
 
+    annotation_files = sorted(glob.glob(f"{annotation_data_path}/TUM_third_pool_*_01_01_annotation.parquet"))
+    if VERBOSE:
+        print(f"Found {len(annotation_files)} annotation files: {annotation_files}")
+
+    annot_data = pd.concat(
+        [pd.read_parquet(f) for f in annotation_files],
+        ignore_index = True
+    )
+
+    if VERBOSE:
+        print(f"initial_meta_data: number of PSM rows: {len(meta_data)}")
+        print(f"initial_meta_data: total unique spectra in raw meta data file: {len(meta_data.groupby(['scan_number', 'raw_file']))}")
+        print(f"initial_meta_data: total unique peptides in raw meta data file: {len(meta_data.groupby(['modified_sequence']))}")
+        print(f"\nintial_annotated_data: total unique spectra in raw annotation file: {lenbt(annot_data.groupby(['scan_number', 'raw_file']))}")
+        print(f"intial_annotated_data: total unique peptides in raw annotation data file: {len(annot_data.groupby(['peptide_sequence']))}")
+
+    # should only contain uppercase letters (excludes PTMs)
     meta_data = meta_data[meta_data['modified_sequence'].apply(is_valid_peptide)]
+
+    if VERBOSE:
+        print(f"\nptm_filtered_meta_data: number of PSM rows: {len(meta_data)}")
+
+    # Andromeda score indicates how well a candidate peptide sequence explains the observed spectrum, higher means a more confident peptide-spectrum match
+    # Spectra instances should have andromeda score of 70 or more
+    meta_data = meta_data[meta_data['andromeda_score'] >= 70]
+
+    # If there are spectra having more than one peptide (mroe than one PSM match), the one is highest andromeda score is selected
+    best_andromeda_score_idx = meta_data.groupby(['scan_number', 'raw_file'])['andromeda_score'].idxmax()
+    meta_data = meta_data.loc[best_andromeda_score_idx].sort_index()
+
+    if VERBOSE:
+        print(f"\nandromeda_filtered_meta_data: number of PSM rows: {len(meta_data)}")
+
+    # Compute peak count per spectrum once, keep only scans with >=20 peaks
+    peak_counts = annot_data.groupby(['scan_number', 'raw_file']).size().reset_index(name='n_peaks')
+    valid_scans = peak_counts[peak_counts['n_peaks'] >= 20][['scan_number', 'raw_file']]
+    meta_data = meta_data.merge(valid_scans, on=['scan_number', 'raw_file'])
+
+    if VERBOSE:
+        print(f"20_peak_filtered_meta_data: number of PSM rows: {len(meta_data)}")
 
     spectra = []
 
@@ -306,9 +332,6 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
             (annot_data['raw_file'] == raw_file)
         ]
 
-        if scan_annot.empty:
-            continue
-
         spectra.append({
             'peptide' : row['modified_sequence'],
             'precursor_mz': row['precursor_mz'],
@@ -317,6 +340,10 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
             'scan_number': scan,
             'raw_file': raw_file,
         })
+
+    if VERBOSE:
+        print(f"\npre-processed, number of PSMs: {len(spectra)}")
+        print(f"pre-processed, number of unique peptides: {len(set(s['peptide'] for s in spectra))}")
 
     return spectra
 
@@ -335,6 +362,13 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, num_exam
     for spec in spectra:
         total += 1
         peptide = spec['peptide']
+
+        if VERBOSE:
+            print(f"\n=====NEW PEPTIDE=====")
+            print(f"Label Peptide: {peptide}")
+            print(f"Tolerance: {tolerance}")
+            print(f"scan number: {spec['scan_number']}")
+            print(f"raw file: {spec['raw_file']}")
 
         y_seq, b_seq, y_match, b_match, y_b_match, reasoning_trace = derive_peptide(
             spec['annotation_rows'],
@@ -401,13 +435,13 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, num_exam
 
 if __name__ == "__main__":
 
-    annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool/TUM_third_pool_1_01_01_annotation.parquet"
+    annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
     OUTPUT_PATH = "output/prospect_reasoning_dataset_v1.json"
-    TOLERANCE = 0.1
+    TOLERANCE = 0.5
     TERMINATION_TOLERANCE= 0.01
     VERBOSE = True
     SAVE_DATASET = True
-    NUM_EXAMPLES = 10
+    NUM_EXAMPLES = 1
 
     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH,NUM_EXAMPLES,SAVE_DATASET, TOLERANCE)
