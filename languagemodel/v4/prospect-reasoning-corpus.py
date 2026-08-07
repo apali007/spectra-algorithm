@@ -3,6 +3,8 @@ import re
 import numpy as np
 import pandas as pd
 import glob
+import os
+import pickle
 
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
@@ -21,6 +23,54 @@ NEUTRAL_LOSS_MASSES = {
 # MASS_NH3 = 17.02655
 MASS_PROTON =  1.00728
 MASS_C13    = 1.00335 # Mass Difference between C-12 and C-13
+
+def validate_precursor(merged_sequence, precursor_mz, precursor_charge, precursor_tolerance):
+
+    if any(aa is None for aa in merged_sequence):
+        return False, None
+
+    theoretical_mass = sum(AA_MASSES[r] for r in merged_sequence) +  NEUTRAL_LOSS_MASSES['H2O']
+    precursor_mass_neutral = precursor_mz * precursor_charge - precursor_charge * MASS_PROTON
+    diff = abs(precursor_mass_neutral - theoretical_mass)
+
+    if diff < precursor_tolerance:
+        return True, diff
+    else:
+        return False, diff
+
+
+def merge_y_b_ions(y_gap_filled, b_gap_filled, n):
+    merged_sequence = [None] * n
+
+    y_gap_filled_reversed = list(reversed(list(y_gap_filled)))
+    for i in range(n):
+        if y_gap_filled_reversed[i] is not None:
+            merged_sequence[i] = y_gap_filled_reversed[i]
+        elif b_gap_filled[i] is not None:
+             merged_sequence[i] = b_gap_filled[i]
+
+    return merged_sequence
+
+def handle_ion_gaps(ion_type, own_derived, other_derived, label_peptide, n):
+
+    label_peptide = list(reversed(list(label_peptide))) if ion_type == 'y' else list(label_peptide)
+
+    # n+1 is not needed because yn and bn is equal to precursor
+    for i in range(n):
+        if own_derived[i] is None:
+
+            if other_derived[n-i-1] is not None:
+                own_derived[i] = label_peptide[i]
+                if VERBOSE:
+                    print(f"{ion_type}{i+1} is filled by {'b' if ion_type == 'y' else 'y'}{n-i}")
+                continue
+
+            if i == 0 and other_derived[n-2] is not None:
+                own_derived[i] = label_peptide[i]
+                if VERBOSE:
+                    print(f"{ion_type}{i+1} is filled by {'b' if ion_type == 'y' else 'y'}{n-1}")
+
+    return own_derived
 
 def is_mass_verified(i , ion_type, mass , ladder_residues, tolerance):
     theoretical_mass = sum(AA_MASSES[r] for r in ladder_residues[:i])
@@ -98,7 +148,8 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_mz, prec
     ladder_residues = list(reversed(residues)) if ion_type == 'y' else residues
 
     traces = [f"Analyzing spectra for the {ion_type}-ion ladder: "]
-    derived = []
+    # Initializing the position of fragment ions to be derived with none.
+    derived_aa_pos = [None] * n
     prev_mz = None
 
     for i in range(1, n + 1):
@@ -106,86 +157,91 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_mz, prec
         if VERBOSE:
                 print(f"{ion_type}{i}, peak_info: {peak_information}")
         
-        if peak_information is not None:
-            mz, charge, nl = peak_information
-            trace_charge_nl, mass = handle_charge_nl(ion_type, mz, charge, nl, i)
-
-            if is_mass_verified(i, ion_type, mass, ladder_residues, tolerance):
-                traces.append(trace_charge_nl)
-            else:
-                prev_mz = None
-                continue
-        else:
+        if peak_information is None:
             prev_mz = None
             continue
+
+        mz, charge, nl = peak_information
+        trace_charge_nl, mass = handle_charge_nl(ion_type, mz, charge, nl, i)
+
+        if not is_mass_verified(i, ion_type, mass, ladder_residues, tolerance):
+            prev_mz = None
+            continue
+
+        traces.append(trace_charge_nl)          
         
         if i == 1: 
-            first_position_trace = handle_first_position(mass, ion_type, ladder_residues, tolerance)
-            traces.append(first_position_trace)
-
+            traces.append(handle_first_position(mass, ion_type, ladder_residues, tolerance))
+        elif prev_mz is not None:
+            predicted_aa_mass = mass-prev_mz
+            traces.append(
+                    f"Difference between {mass:.5f} and {prev_mz:.5f} gives {predicted_aa_mass:.5f}, "
+                    f"Identifying the amino acid residue as {ladder_residues[i-1]}. "
+                )   
         else:
-            if prev_mz is not None:
-                predicted_aa_mass = mass-prev_mz
-                traces.append(
-                        f"Difference between {mass:.5f} and {prev_mz:.5f} gives {predicted_aa_mass:.5f}, "
-                        f"Identifying the amino acid residue as {ladder_residues[i-1]}."
-                    )
-                
-            else:
-                predicted_aa_mass = mass
-                traces.append(
-                    f"Identifying the amino acid residue as {ladder_residues[i-1]}."
-                )
+            predicted_aa_mass = mass
+            traces.append(
+                f"Identifying the amino acid residue as {ladder_residues[i-1]}. "
+            )
 
-            prev_mz = mass
+        derived_aa_pos[i-1] = ladder_residues[i-1]
+        prev_mz = mass
 
-        derived.append(ladder_residues[i-1])
+    detected_positions = [f"{ion_type}{i+1}" for i, aa in enumerate(derived_aa_pos) if aa is not None]
+    gap_positions = [f"{ion_type}{i+1}" for i, aa in enumerate(derived_aa_pos) if aa is None]
 
-    final_seq = ''.join(derived)
-    traces.append(f"The complete sequence from the {ion_type}-ion ladder is predicted as {final_seq}.")
+    if VERBOSE:
+        print(f"detected_positions: {', '.join(detected_positions)}")
+        print(f"gap_positions: {', '.join(gap_positions)}")
 
-    return_final_seq = ''.join(reversed(derived)) if ion_type == 'y' else ''.join(derived)
+    if gap_positions:
+        traces.append(
+            f"The {ion_type}-ion ladder confirmed residues at positions "
+            f"{', '.join(detected_positions)}. No reliable fragment ion was found at "
+            f"{', '.join(gap_positions)}. "
+        )
+    else:
+        traces.append(
+            f"The {ion_type}-ion ladder confirmed residues at every position: "
+            f"{', '.join(detected_positions)}."
+        )
+    
+    return derived_aa_pos, traces
 
-    return return_final_seq, traces
+def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charge, tolerance, precursor_tolerance):
 
-
-def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charge, tolerance):
-
+    n = len(label_peptide)
+    if VERBOSE:
+        print(f"Length of the peptide: {n}")
+        print(f"precursor_mz: {precursor_mz}")
+        print(f"precursor_mz: {precursor_charge}")
     reasoning_trace = []
     annotation_lookup = build_annotation_lookup(annotation_rows)
 
-    y_sequences, y_traces = extend_ladder('y', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance)
-    y_match = y_sequences == label_peptide
+    y_derived, y_traces = extend_ladder('y', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance)
     reasoning_trace.append('\n'.join(y_traces))
-
-    if VERBOSE:
-        print(f"Predicted y_seq: {y_sequences}")
-        print(f"y_match: {y_match}\n")
 
     reasoning_trace.append("Now, trying to derive the sequence using the b-ion ladder. ")
 
-    b_sequences, b_traces = extend_ladder('b', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance) 
-    b_match = b_sequences == label_peptide
+    b_derived, b_traces = extend_ladder('b', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance) 
     reasoning_trace.append('\n'.join(b_traces))
 
+    y_gap_filled = handle_ion_gaps('y', y_derived, b_derived, label_peptide, n)
+    b_gap_filled = handle_ion_gaps('b', b_derived, y_derived, label_peptide, n)
+    merged_sequence = merge_y_b_ions(y_gap_filled, b_gap_filled, n)
+
+    merged_str = ''.join(aa if aa is not None else '?' for aa in merged_sequence)
+
+    is_precursor_match, precursor_diff = validate_precursor(merged_sequence, precursor_mz, precursor_charge, precursor_tolerance)
+    is_match = label_peptide == merged_str
+    
     if VERBOSE:
-            print(f"Predicted b_seq: {b_sequences}")
-            print(f"b_match: {b_match}")
-
-    y_b_match = y_sequences == b_sequences
-
-    if VERBOSE:
-        print(f"y_b_match: {y_b_match}")
-
-    if y_b_match:
-        reasoning_trace.append(f"Both y-ion and b-ion agree, giving the final derived sequence: {y_sequences}. ")
-    else:
-        reasoning_trace.append(f"The y-ion ladder gives {y_sequences} while the b-ion ladder gives {b_sequences}. "
-                               f"They do not agree, so the sequence could not be confidently cross verified. ")
+            print(f"merged_sequence: {merged_str}")
+            print(f"is_precursor_match: {is_precursor_match}, diff: {precursor_diff}")
 
     complete_resoning_trace = '\n'.join(reasoning_trace)
 
-    return y_sequences, b_sequences, y_match, b_match, y_b_match, complete_resoning_trace
+    return is_match, is_precursor_match, merged_sequence, complete_resoning_trace
 
     
 def filter_top_peaks(mz, intensity, top_n):
@@ -273,10 +329,18 @@ def build_annotation_lookup(annotation_rows):
     
     return annotation_lookup
 
-def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
+def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra=1):
+
+    # check if cache directory exists (100_prospect_cache.pkl)
+    if os.path.exists(cache_path):
+        if VERBOSE:
+            print(f"Found cache at {cache_path}, loading instead of reprocessing")
+        with open(cache_path, 'rb') as f:
+            spectra_100 = pickle.load(f)
+        return spectra_100[:max_spectra]
+
 
     meta_data = pd.read_parquet(meta_data_path)
-
     annotation_files = sorted(glob.glob(f"{annotation_data_path}/TUM_third_pool_*_01_01_annotation.parquet"))
     if VERBOSE:
         print(f"Found {len(annotation_files)} annotation files: {annotation_files}")
@@ -290,7 +354,7 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
         print(f"initial_meta_data: number of PSM rows: {len(meta_data)}")
         print(f"initial_meta_data: total unique spectra in raw meta data file: {len(meta_data.groupby(['scan_number', 'raw_file']))}")
         print(f"initial_meta_data: total unique peptides in raw meta data file: {len(meta_data.groupby(['modified_sequence']))}")
-        print(f"\nintial_annotated_data: total unique spectra in raw annotation file: {lenbt(annot_data.groupby(['scan_number', 'raw_file']))}")
+        print(f"\nintial_annotated_data: total unique spectra in raw annotation file: {len(annot_data.groupby(['scan_number', 'raw_file']))}")
         print(f"intial_annotated_data: total unique peptides in raw annotation data file: {len(annot_data.groupby(['peptide_sequence']))}")
 
     # should only contain uppercase letters (excludes PTMs)
@@ -303,7 +367,7 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
     # Spectra instances should have andromeda score of 70 or more
     meta_data = meta_data[meta_data['andromeda_score'] >= 70]
 
-    # If there are spectra having more than one peptide (mroe than one PSM match), the one is highest andromeda score is selected
+    # If there are spectra having more than one peptide (more than one PSM match), the one is highest andromeda score is selected
     best_andromeda_score_idx = meta_data.groupby(['scan_number', 'raw_file'])['andromeda_score'].idxmax()
     meta_data = meta_data.loc[best_andromeda_score_idx].sort_index()
 
@@ -321,7 +385,8 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
     spectra = []
 
     for i, (_,row) in enumerate(meta_data.iterrows()):
-        if i>= max_spectra:
+
+        if i >= max_spectra:
             break
         
         scan = row['scan_number']
@@ -345,18 +410,24 @@ def load_prospect(annotation_data_path, meta_data_path, max_spectra=1):
         print(f"\npre-processed, number of PSMs: {len(spectra)}")
         print(f"pre-processed, number of unique peptides: {len(set(s['peptide'] for s in spectra))}")
 
+    # Create cache directory
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, 'wb') as f:
+        pickle.dump(spectra, f)
+    if VERBOSE:
+        print(f"Saved {len(spectra)} spectra to cache at {cache_path}")
+
     return spectra
 
 def normalize(s):
     return s.replace('I', 'L')
 
-def process_prospect(annotation_data_path, meta_data_path, output_path, num_examples, save_dataset, tolerance):
-    spectra = load_prospect(annotation_data_path, meta_data_path, num_examples)
+def process_prospect(annotation_data_path, meta_data_path, output_path, cache_path, num_examples, save_dataset, tolerance, precursor_tolerance):
+    spectra = load_prospect(annotation_data_path, meta_data_path, cache_path, num_examples)
 
     total = 0
-    y_correct = 0
-    b_correct = 0
-    y_b_correct = 0
+    count_label_match = 0
+    count_precursor_match = 0
     dataset = []
 
     for spec in spectra:
@@ -365,36 +436,28 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, num_exam
 
         if VERBOSE:
             print(f"\n=====NEW PEPTIDE=====")
-            print(f"Label Peptide: {peptide}")
-            print(f"Tolerance: {tolerance}")
+            print(f"label Peptide: {peptide}")
+            print(f"tolerance: {tolerance}")
+            print(f"precursor_tolerance: {precursor_tolerance}")
             print(f"scan number: {spec['scan_number']}")
             print(f"raw file: {spec['raw_file']}")
 
-        y_seq, b_seq, y_match, b_match, y_b_match, reasoning_trace = derive_peptide(
+        is_label_match, is_precusor_match, predicted_sequence, reasoning_trace = derive_peptide(
             spec['annotation_rows'],
             spec['peptide'],
             spec['precursor_mz'],
-            spec['precursor_charge'], tolerance
+            spec['precursor_charge'], tolerance, precursor_tolerance
         )
 
-        if y_match:
-            y_correct +=1
+        if is_label_match: 
+            count_label_match += 1
             if VERBOSE:
-                print(f"Correct y_sequence match")
-                print(f"scan number: {spec['scan_number']}")
-                print(f"raw file: {spec['raw_file']}")
-        
-        if b_match:
-            b_correct +=1
-            if VERBOSE:
-                print(f"Correct b_sequence match")
-                print(f"scan number: {spec['scan_number']}")
-                print(f"raw file: {spec['raw_file']}")
+                print(f"predicted sequence is correctly matches with the label peptide")
 
-        if y_b_match: 
-            y_b_correct += 1
+        if is_precusor_match: 
+            count_precursor_match += 1
             if VERBOSE:
-                print(f"y and b sequence match is correct")
+                print(f"predicted sequence is correctly matches with the precursor information")
             
         if save_dataset:
             dataset.append({
@@ -407,11 +470,9 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, num_exam
             'peptide': peptide,
             'scan_number': spec['scan_number'],
             'raw_file': spec['raw_file'],
-            'y_seq': y_seq,
-            'b_seq': b_seq,
-            'y_match': y_match,
-            'b_match': b_match,
-            'y_b_match': y_b_match
+            'pred_seq': predicted_sequence,
+            'is_label_match': is_label_match,
+            'is_precusor_match': is_precusor_match
             })
         
             # Store correct peptides
@@ -422,9 +483,8 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, num_exam
 
     print("\nResults:")
     print(f"Total: {total}")
-    print(f"Y correct: {y_correct} ({100*y_correct/total:.1f}%)")
-    print(f"B correct: {b_correct} ({100*b_correct/total:.1f}%)")
-    print(f"y and b correct: {y_b_correct} ({100*y_b_correct/total:.1f}%)")
+    print(f"correct label matches: {count_label_match} ({100*count_label_match/total:.1f}%)")
+    print(f"correct precursor matches: {count_precursor_match} ({100*count_precursor_match/total:.1f}%)")
 
     if save_dataset:
         print(f"Dataset size: {len(dataset)}")
@@ -437,11 +497,13 @@ if __name__ == "__main__":
 
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "output/prospect_reasoning_dataset_v1.json"
-    TOLERANCE = 0.5
+    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_reasoning_dataset_v1.json"
+    CACHE_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
+    TOLERANCE = 0.2
+    PRECURSOR_TOLERANCE = 0.1
     TERMINATION_TOLERANCE= 0.01
     VERBOSE = True
-    SAVE_DATASET = True
-    NUM_EXAMPLES = 1
+    SAVE_DATASET = False
+    NUM_EXAMPLES = 100
 
-    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH,NUM_EXAMPLES,SAVE_DATASET, TOLERANCE)
+    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH, NUM_EXAMPLES,SAVE_DATASET, TOLERANCE, PRECURSOR_TOLERANCE)
