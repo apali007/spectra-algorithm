@@ -309,7 +309,6 @@ def build_peak_priority(precursor_charge):
             priority.append((charge, nl))
     return priority
 
-
 def get_peak(annotation_lookup, ion_type, position, precursor_charge):
     
     for charge, nl in build_peak_priority(precursor_charge):
@@ -329,15 +328,16 @@ def build_annotation_lookup(annotation_rows):
     
     return annotation_lookup
 
-def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra=1):
+def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra, use_cache):
 
-    # check if cache directory exists (100_prospect_cache.pkl)
-    if os.path.exists(cache_path):
-        if VERBOSE:
-            print(f"Found cache at {cache_path}, loading instead of reprocessing")
-        with open(cache_path, 'rb') as f:
-            spectra_100 = pickle.load(f)
-        return spectra_100[:max_spectra]
+    if use_cache:
+        # check if cache directory exists (100_prospect_cache.pkl)
+        if os.path.exists(cache_path):
+            if VERBOSE:
+                print(f"Found cache at {cache_path}, loading instead of reprocessing")
+            with open(cache_path, 'rb') as f:
+                spectra = pickle.load(f)
+            return spectra[:max_spectra]
 
 
     meta_data = pd.read_parquet(meta_data_path)
@@ -382,25 +382,40 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra=
     if VERBOSE:
         print(f"20_peak_filtered_meta_data: number of PSM rows: {len(meta_data)}")
 
+    filtered_annot = annot_data.merge(
+        meta_data[['scan_number', 'raw_file']],
+        on=['scan_number', 'raw_file'])
+
+    unique_triples = filtered_annot[['scan_number', 'raw_file', 'peptide_sequence']].drop_duplicates()
+    unique_pairs = filtered_annot[['scan_number', 'raw_file']].drop_duplicates()
+
+    if VERBOSE:
+        print(f"\n Ambiguity check (on filtered spectra only):")
+        print(f" unique (scan, raw_file, peptide) triples: {len(unique_triples)}")
+        print(f" unique (scan, raw_file) pairs: {len(unique_pairs)}")
+        print(f" difference (ambigous scans) : {len(unique_triples) - len(unique_pairs)}")
+
+    annot_groups = dict(
+        filtered_annot.groupby(['scan_number', 'raw_file', 'peptide_sequence'])
+    )
+    
     spectra = []
 
-    for i, (_,row) in enumerate(meta_data.iterrows()):
-
-        if i >= max_spectra:
-            break
+    for i, row in enumerate(meta_data.itertuples(index=False)):
         
-        scan = row['scan_number']
-        raw_file = row['raw_file']
+        scan = row.scan_number
+        raw_file = row.raw_file
+        peptide = row.modified_sequence
 
-        scan_annot = annot_data[
-            (annot_data['scan_number'] == scan) &
-            (annot_data['raw_file'] == raw_file)
-        ]
+        scan_annot = annot_groups.get((scan, raw_file, peptide))
+
+        if scan_annot is None:
+            continue
 
         spectra.append({
-            'peptide' : row['modified_sequence'],
-            'precursor_mz': row['precursor_mz'],
-            'precursor_charge': int(row['precursor_charge']),
+            'peptide' : peptide,
+            'precursor_mz': row.precursor_mz,
+            'precursor_charge': int(row.precursor_charge),
             'annotation_rows': scan_annot,
             'scan_number': scan,
             'raw_file': raw_file,
@@ -410,20 +425,21 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra=
         print(f"\npre-processed, number of PSMs: {len(spectra)}")
         print(f"pre-processed, number of unique peptides: {len(set(s['peptide'] for s in spectra))}")
 
-    # Create cache directory
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    with open(cache_path, 'wb') as f:
-        pickle.dump(spectra, f)
-    if VERBOSE:
-        print(f"Saved {len(spectra)} spectra to cache at {cache_path}")
+    if use_cache:
+        # Create cache directory
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, 'wb') as f:
+            pickle.dump(spectra, f)
+        if VERBOSE:
+            print(f"Saved {len(spectra)} spectra to cache at {cache_path}")
 
-    return spectra
+    return spectra[:max_spectra]
 
 def normalize(s):
     return s.replace('I', 'L')
 
-def process_prospect(annotation_data_path, meta_data_path, output_path, cache_path, num_examples, save_dataset, tolerance, precursor_tolerance):
-    spectra = load_prospect(annotation_data_path, meta_data_path, cache_path, num_examples)
+def process_prospect(annotation_data_path, meta_data_path, output_path, cache_path, num_examples, save_dataset, tolerance, precursor_tolerance, use_cache):
+    spectra = load_prospect(annotation_data_path, meta_data_path, cache_path, num_examples, use_cache)
 
     total = 0
     count_label_match = 0
@@ -498,12 +514,14 @@ if __name__ == "__main__":
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
     OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_reasoning_dataset_v1.json"
-    CACHE_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
+    CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
+    CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     TOLERANCE = 0.2
     PRECURSOR_TOLERANCE = 0.1
     TERMINATION_TOLERANCE= 0.01
     VERBOSE = True
     SAVE_DATASET = False
-    NUM_EXAMPLES = 100
+    NUM_EXAMPLES = 1
+    use_cache = True
 
-    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH, NUM_EXAMPLES,SAVE_DATASET, TOLERANCE, PRECURSOR_TOLERANCE)
+    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA, NUM_EXAMPLES,SAVE_DATASET, TOLERANCE, PRECURSOR_TOLERANCE, use_cache)
