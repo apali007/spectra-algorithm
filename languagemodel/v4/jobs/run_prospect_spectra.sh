@@ -3,7 +3,7 @@
 #SBATCH --output=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/output_%j.log
 #SBATCH --error=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/error_%j.err
 #SBATCH --time=24:00:00
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --partition=compute
 #SBATCH --nodes=1
 
@@ -14,3 +14,4 @@ export LD_LIBRARY_PATH=/lclhome/apali007/miniconda3/envs/spectra/lib:$LD_LIBRARY
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 echo "Running on node: $(hostname)"
 python prospect-reasoning-corpus.py
+# python prospect_practice.py

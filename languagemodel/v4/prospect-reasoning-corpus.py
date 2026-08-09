@@ -38,7 +38,6 @@ def validate_precursor(merged_sequence, precursor_mz, precursor_charge, precurso
     else:
         return False, diff
 
-
 def merge_y_b_ions(y_gap_filled, b_gap_filled, n):
     merged_sequence = [None] * n
 
@@ -96,9 +95,9 @@ def handle_charge_nl(ion_type, mz, charge, nl, i):
         correct_mass = singly_charged + NEUTRAL_LOSS_MASSES[nl]
        
         traces = (
-                f"{ion_type}{i} can be identified by mz_peak at {mz:.5f} Da with charge {charge} "
-                f"and neutral loss of {nl}. Converting into singly charged ion, it becomes "
-                f"{singly_charged:.5f} Da. Correcting the mass, it becomes {correct_mass:.5f} Da."
+                f"Fragment {ion_type}{i} is identified by mz_peak at {mz:.5f} Da with charge {charge} "
+                f"and neutral loss of {nl}. Converting into a singly charged ion, it becomes "
+                f"{singly_charged:.5f} Da. Correcting for the neutral loss, it becomes {correct_mass:.5f} Da. "
                 )
         final_mass = correct_mass
 
@@ -106,21 +105,21 @@ def handle_charge_nl(ion_type, mz, charge, nl, i):
     elif charge > 1:
         singly_charged = mz * charge - (charge - 1) * MASS_PROTON
         traces = (
-                f"{ion_type}{i} can be identified by mz_peak at {mz:.5f} Da with charge {charge}. "
-                f"Converting into singly charged ion, it becomes {singly_charged:.5f} Da.")
+                f"Fragment {ion_type}{i} is identified by mz_peak at {mz:.5f} Da with charge {charge}. "
+                f"Converting into singly charged ion, it becomes {singly_charged:.5f} Da. ")
         final_mass = singly_charged
 
     # single charge with nl
     elif nl is not None: 
         correct_mass = mz + NEUTRAL_LOSS_MASSES[nl]
         traces = (
-                f"{ion_type}{i} can be identified by mz_peak at {mz:.5f} Da  with charge {charge} and neutral loss of {nl} Da. "
-                f"Correcting the mass, it becomes {correct_mass:.5f} Da.")
+                f"Fragment {ion_type}{i} is identified by mz_peak at {mz:.5f} Da with charge {charge} and neutral loss of {nl}. "
+                f"Correcting the mass, it becomes {correct_mass:.5f} Da. ")
         final_mass = correct_mass
 
     # single charge with no nl
     else:
-        traces = f"{ion_type}{i} can be identified by mz_peak at {mz:.5f} Da. "
+        traces = f"Fragment {ion_type}{i} is identified by mz_peak at {mz:.5f} Da. "
         final_mass = mz
     
     return traces, final_mass
@@ -147,7 +146,8 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_mz, prec
     n = len(residues)
     ladder_residues = list(reversed(residues)) if ion_type == 'y' else residues
 
-    traces = [f"Analyzing spectra for the {ion_type}-ion ladder: "]
+    traces = []
+
     # Initializing the position of fragment ions to be derived with none.
     derived_aa_pos = [None] * n
     prev_mz = None
@@ -218,11 +218,13 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     reasoning_trace = []
     annotation_lookup = build_annotation_lookup(annotation_rows)
 
+    reasoning_trace.append("Analyzing spectra for the y-ion and b-ion ladder to predict the peptide sequence, using the given precursor information. ")
+
+    reasoning_trace.append("First, trying to derive the sequence using the y-ion ladder (C-terminus to N-terminus): ")
     y_derived, y_traces = extend_ladder('y', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance)
     reasoning_trace.append('\n'.join(y_traces))
 
     reasoning_trace.append("Now, trying to derive the sequence using the b-ion ladder. ")
-
     b_derived, b_traces = extend_ladder('b', annotation_lookup, label_peptide, precursor_mz, precursor_charge, tolerance) 
     reasoning_trace.append('\n'.join(b_traces))
 
@@ -242,7 +244,6 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     complete_resoning_trace = '\n'.join(reasoning_trace)
 
     return is_match, is_precursor_match, merged_sequence, complete_resoning_trace
-
     
 def filter_top_peaks(mz, intensity, top_n):
     mz_array = np.array(mz)
@@ -316,7 +317,6 @@ def get_peak(annotation_lookup, ion_type, position, precursor_charge):
         if k in annotation_lookup:
             return annotation_lookup[k], charge, nl
     return None
-
 
 def build_annotation_lookup(annotation_rows):
     
@@ -395,9 +395,7 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra,
         print(f" unique (scan, raw_file) pairs: {len(unique_pairs)}")
         print(f" difference (ambigous scans) : {len(unique_triples) - len(unique_pairs)}")
 
-    annot_groups = dict(
-        filtered_annot.groupby(['scan_number', 'raw_file', 'peptide_sequence'])
-    )
+    annot_index = filtered_annot.groupby(['scan_number', 'raw_file', 'peptide_sequence']).indices
     
     spectra = []
 
@@ -407,10 +405,12 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra,
         raw_file = row.raw_file
         peptide = row.modified_sequence
 
-        scan_annot = annot_groups.get((scan, raw_file, peptide))
+        idx = annot_index.get((scan, raw_file, peptide))
 
-        if scan_annot is None:
+        if idx is None:
             continue
+
+        scan_annot = filtered_annot.iloc[idx]
 
         spectra.append({
             'peptide' : peptide,
