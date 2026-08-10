@@ -41,8 +41,6 @@ LEARNING_RATE = 2e-4
 WARMUP_RATIO = 0.05
 
 
-
-
 # NO PEPTIDE OVERLAP IN TRAIN AND TEST
 # TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_train.json"
 # TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_test.json"
@@ -51,10 +49,10 @@ WARMUP_RATIO = 0.05
 # OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4"
 
 # 10% PEPTIDE OVERLAP IN TRAIN AND TEST
-TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_train.json"
-TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json"
+# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_train.json"
+# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json"
 
-OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP"
+# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP"
 
 # 20% PEPTIDE OVERLAP IN TRAIN AND TEST
 # TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_train.json"
@@ -62,6 +60,12 @@ OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/chec
 
 # OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP"
 
+
+# PROSPECT reasoning dataset
+TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_train.json"
+TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_test.json"
+
+OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-prospect"
 
 # Takes the path from JSONL/input file and the tokenizer. Returns formatted train and test datasets
 def load_and_format(tokenizer):
@@ -73,13 +77,30 @@ def load_and_format(tokenizer):
             {
                 "role": "system",
                   "content": (
-                    "You are SpectraChatModel, an expert mass spectrometry assistant. "
-                    "Given a MS/MS spectrum with precursor mass and charge, identify the peptide sequence "
-                    "by reasoning step-by-step through the y-ion ladder. "
-                    "Start by identifying y1 candidates, then extend the y-ion ladder residue by residue of amino acids. "
-                    "If the ladder becomes ambiguous or no candidates are found, state clearly that the "
-                    "peptide sequence cannot be determined. "
-                    "Conclude with the complete predicted peptide sequence if derivable."
+                    "You are SpectraChatModel, an expert mass spectrometry assistant specializing in "
+                    "de novo peptide sequencing from MS/MS spectra.\n\n"
+                    "Given a spectrum's precursor mass, precursor charge, and list of fragment ion peaks, "
+                    "determine the peptide sequence by reasoning step-by-step through complementary fragment "
+                    "ion ladders:\n"
+                    "1. First, attempt to derive the sequence using the y-ion ladder (C-terminus to N-terminus). "
+                    "For each position, identify the fragment peak, verify its mass against the expected "
+                    "residue mass within tolerance, and compute the residue from the mass difference between "
+                    "consecutive fragments. If the ladder resolves completely, confirm it against the precursor "
+                    "mass and stop.\n"
+                    "2. If gaps remain in the y-ion ladder, attempt the b-ion ladder (N-terminus to C-terminus) "
+                    "the same way. If the b-ion ladder alone resolves completely, confirm it against the "
+                    "precursor mass and stop.\n"
+                    "3. If both ladders have gaps, merge them: for each unresolved b-ion position, check whether "
+                    "the y-ion ladder resolved that same position, and vice versa.\n"
+                    "4. If exactly one residue remains unresolved after merging, recover it by subtracting the "
+                    "known residues and one water molecule from the precursor mass.\n"
+                    "5. When a terminal residue (the first or last position) has no fragment peak, recover it "
+                    "from the adjacent known fragment and the precursor mass rather than reporting it as missing.\n"
+                    "6. If two or more residues remain unresolved after merging, or the recovered mass does not "
+                    "match any residue within tolerance, state clearly that the complete sequence cannot be "
+                    "determined, and report the partial sequence with unresolved positions marked.\n\n"
+                    "Always validate any complete candidate sequence against the precursor mass before reporting "
+                    "it as final. Show your arithmetic explicitly at each step."
                 ),
             },
             {"role": "user", "content": example["input"]},
@@ -185,9 +206,8 @@ def main():
         # How learning rate changes over time. Cosine means it starts at 2e-4, gradually decreases following a cosine curve, ending near zero. Prevents overshooting at the end of the training.
         lr_scheduler_type = "cosine",
 
-        # For the first 5 steps, learning rate gradually increases from 0 to 2e-4. Prevents unstable updates at the very start.
-        warmup_steps = int(100 * WARMUP_RATIO),
-
+        warmup_ratio = WARMUP_RATIO,
+ 
         # Regularization: Penalizes large weights slightly to prevent overfitting
         weight_decay = 0.01,
 
@@ -302,28 +322,58 @@ def main():
     # switches the model from training mode to inference mode, renables KV cache and optimizes for generation speed
     FastLanguageModel.for_inference(model)
 
-    sample = "Precursor mz: 667.85479 Da, Precursor Charge: 2\nExperimental MS/MS spectrum (m/z):\nm/z 147.112804\nm/z 185.055683\nm/z 195.040033\nm/z 212.066582\nm/z 213.050597\nm/z 218.149918\nm/z 230.077146\nm/z 278.113532" \
-    "\nm/z 330.108447\nm/z 331.233982\nm/z 348.119012\nm/z 364.724313\nm/z 364.724313\nm/z 375.129911\nm/z 376.113926\nm/z 393.140475\nm/z 393.140475\nm/z 405.763438\nm/z 406.261063\nm/z 414.276713\nm/z 414.276713\nm/z 419.156126" \
-    "\nm/z 448.769252\nm/z 470.308544\nm/z 471.790184\nm/z 473.130305\nm/z 485.224874\nm/z 487.335093\nm/z 490.156854\nm/z 491.140869\nm/z 493.738149\nm/z 494.230156\nm/z 494.722164\nm/z 502.743431\nm/z 502.743431\nm/z 508.167418" \
-    "\nm/z 544.316566\nm/z 544.795998\nm/z 544.808574\nm/z 544.808574\nm/z 544.814191\nm/z 545.282389\nm/z 545.288006\nm/z 545.288006\nm/z 550.772188\nm/z 550.772189\nm/z 550.777805\nm/z 553.321849\nm/z 553.813856\nm/z 558.314024" \
-    "\nm/z 559.285463\nm/z 559.285463\nm/z 569.365725\nm/z 569.376958\nm/z 586.290745\nm/z 586.392274\nm/z 586.403507\nm/z 601.188883\nm/z 601.830038\nm/z 610.343312\nm/z 618.215432\nm/z 619.199447\nm/z 636.225996\nm/z 636.225996" \
-    "\nm/z 682.461022\nm/z 687.262048\nm/z 699.487571\nm/z 704.288597\nm/z 715.256962\nm/z 731.299496\nm/z 732.283511\nm/z 732.294745\nm/z 749.310060\nm/z 796.456331\nm/z 810.519600\nm/z 811.514849\nm/z 827.546149\nm/z 827.546149" \
-    "\nm/z 831.351925\nm/z 848.378474\nm/z 924.562527\nm/z 925.546543\nm/z 942.573092\nm/z 959.519660\nm/z 976.484671\nm/z 976.509824\nm/z 986.469021\nm/z 987.453036\nm/z 1004.479585\nm/z 1004.479585\nm/z 1073.562587\nm/z 1073.573820" \
-    "\nm/z 1073.573820\nm/z 1087.625856\nm/z 1088.584719\nm/z 1088.609872\nm/z 1088.609872\nm/z 1088.621105\nm/z 1089.557502\nm/z 1089.568735\nm/z 1089.568735\nm/z 1090.552751\nm/z 1100.537100\nm/z 1100.537101\nm/z 1105.636421" \
-    "\nm/z 1106.620436\nm/z 1117.563649\nm/z 1117.563650\nm/z 1118.547665\nm/z 1118.558899\nm/z 1118.558899\nm/z 1118.584051\nm/z 1160.605849\nm/z 1160.605849\nm/z 1171.574214\nm/z 1188.600763" \
+    sample = "Precursor mz: 667.85479 Da, Precursor Charge: 2\nExperimental MS/MS spectrum (m/z, intensity):" \
+    "\nm/z 147.11246, intensity 0.31000\nm/z 185.05533, intensity 0.10000\nm/z 195.03891, intensity 0.03000\nm/z 212.06584, intensity 0.14000" \
+    "\nm/z 213.05009, intensity 0.12000\nm/z 218.14929, intensity 0.26000\nm/z 230.07646, intensity 1.00000\nm/z 278.11417, intensity 0.02000" \
+    "\nm/z 330.10748, intensity 0.02000\nm/z 331.23291, intensity 0.10000\nm/z 348.11713, intensity 0.13000\nm/z 364.72824, intensity 0.01000" \
+    "\nm/z 375.13028, intensity 0.02000\nm/z 376.11121, intensity 0.08000\nm/z 393.13873, intensity 0.15000\nm/z 405.76367, intensity 0.09000" \
+    "\nm/z 406.26431, intensity 0.02000\nm/z 414.27802, intensity 0.11000\nm/z 419.15717, intensity 0.03000\nm/z 448.76730, intensity 0.02000" \
+    "\nm/z 470.30945, intensity 0.02000\nm/z 471.78757, intensity 0.08000\nm/z 473.13153, intensity 0.04000\nm/z 485.22443, intensity 0.03000" \
+    "\nm/z 487.33368, intensity 0.49000\nm/z 490.15421, intensity 0.04000\nm/z 491.13788, intensity 0.09000\nm/z 493.73444, intensity 0.02000" \
+    "\nm/z 494.22699, intensity 0.11000\nm/z 494.73117, intensity 0.02000\nm/z 502.74188, intensity 0.24000\nm/z 508.16580, intensity 0.18000" \
+    "\nm/z 544.31299, intensity 0.02000\nm/z 544.80511, intensity 0.05000\nm/z 545.29236, intensity 0.06000\nm/z 550.77295, intensity 0.02000" \
+    "\nm/z 553.32050, intensity 0.44000\nm/z 553.82349, intensity 0.14000\nm/z 558.31573, intensity 0.02000\nm/z 559.28375, intensity 0.04000" \
+    "\nm/z 569.37494, intensity 0.03000\nm/z 586.29449, intensity 0.03000\nm/z 586.40192, intensity 0.47000\nm/z 601.17957, intensity 0.02000" \
+    "\nm/z 601.82806, intensity 0.06000\nm/z 610.34058, intensity 0.40000\nm/z 618.21326, intensity 0.02000\nm/z 619.19519, intensity 0.05000" \
+    "\nm/z 636.22620, intensity 0.12000\nm/z 682.45514, intensity 0.04000\nm/z 687.25146, intensity 0.02000\nm/z 699.48553, intensity 0.43000" \
+    "\nm/z 704.29138, intensity 0.02000\nm/z 715.25244, intensity 0.03000\nm/z 731.29834, intensity 0.02000\nm/z 732.28296, intensity 0.06000" \
+    "\nm/z 749.30914, intensity 0.12000\nm/z 796.46094, intensity 0.05000\nm/z 810.51990, intensity 0.16000\nm/z 811.52142, intensity 0.04000" \
+    "\nm/z 827.54382, intensity 0.55000\nm/z 831.35925, intensity 0.03000\nm/z 848.36932, intensity 0.03000\nm/z 924.56531, intensity 0.05000" \
+    "\nm/z 925.55377, intensity 0.08000\nm/z 942.57092, intensity 0.82000\nm/z 959.51770, intensity 0.05000\nm/z 976.49286, intensity 0.01000" \
+    "\nm/z 986.47412, intensity 0.02000\nm/z 987.46826, intensity 0.03000\nm/z 1004.47638, intensity 0.24000\nm/z 1073.55994, intensity 0.02000" \
+    "\nm/z 1087.62561, intensity 0.03000\nm/z 1088.60034, intensity 0.03000\nm/z 1089.56531, intensity 0.11000\nm/z 1090.55603, intensity 0.02000" \
+    "\nm/z 1100.52588, intensity 0.03000\nm/z 1105.63049, intensity 0.29000\nm/z 1106.63342, intensity 0.08000\nm/z 1117.57019, intensity 0.16000" \
+    "\nm/z 1118.56238, intensity 0.04000\nm/z 1160.59924, intensity 0.06000\nm/z 1171.57361, intensity 0.03000\nm/z 1188.59583, intensity 0.32000" \
     "\nAnalyze this spectrum and identify the most likely peptide sequence."
 
     messages = [
         {"role": "system", 
-        "content": (
-                    "You are SpectraChatModel, an expert mass spectrometry assistant. "
-                    "Given a MS/MS spectrum with precursor mass and charge, identify the peptide sequence "
-                    "by reasoning step-by-step through the y-ion ladder. "
-                    "Start by identifying y1 candidates, then extend the y-ion ladder residue by residue of amino acids. "
-                    "If the ladder becomes ambiguous or no candidates are found, state clearly that the "
-                    "peptide sequence cannot be determined. "
-                    "Conclude with the complete predicted peptide sequence if derivable."
-                ),
+                "content": (
+            "You are SpectraChatModel, an expert mass spectrometry assistant specializing in "
+            "de novo peptide sequencing from MS/MS spectra.\n\n"
+            "Given a spectrum's precursor mass, precursor charge, and list of fragment ion peaks, "
+            "determine the peptide sequence by reasoning step-by-step through complementary y and b ion "
+            "fragment ladders:\n"
+            "1. First, attempt to derive the sequence using the y-ion ladder (C-terminus to N-terminus). "
+            "For each position, identify the fragment peak, verify its mass against the expected "
+            "residue mass within tolerance, and compute the residue from the mass difference between "
+            "consecutive fragments. If the ladder resolves completely, confirm it against the precursor "
+            "mass and stop.\n"
+            "2. If gaps remain in the y-ion ladder, attempt the b-ion ladder (N-terminus to C-terminus) "
+            "the same way. If the b-ion ladder alone resolves completely, confirm it against the "
+            "precursor mass and stop.\n"
+            "3. If both ladders have gaps, merge them: for each unresolved b-ion position, check whether "
+            "the y-ion ladder resolved that same position, and vice versa.\n"
+            "4. If exactly one residue remains unresolved after merging, recover it by subtracting the "
+            "known residues and one water molecule from the precursor mass.\n"
+            "5. When a terminal residue (the first or last position) has no fragment peak, recover it "
+            "from the adjacent known fragment and the precursor mass rather than reporting it as missing.\n"
+            "6. If two or more residues remain unresolved after merging, or the recovered mass does not "
+            "match any residue within tolerance, state clearly that the complete sequence cannot be "
+            "determined, and report the partial sequence with unresolved positions marked.\n\n"
+            "Always validate any complete candidate sequence against the precursor mass before reporting "
+            "it as final. Show your arithmetic explicitly at each step."
+        ),
          },
         {"role": "user", "content": sample},
     ]

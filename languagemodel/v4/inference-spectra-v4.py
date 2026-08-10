@@ -5,9 +5,10 @@ from unsloth.chat_templates import get_chat_template
 import re
 import os
 
-MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
+# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4/merged_16bit/"
 # MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-10-OVERLAP/merged_16bit/"
 # MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-20-OVERLAP/merged_16bit/"
+MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-prospect/merged_16bit/"
 
 
 MAX_SEQ_LENGTH = 4096
@@ -15,19 +16,57 @@ MAX_NEW_TOKENS = 2048
 TEMPERATURE = 0.1
 
 SYSTEM_PROMPT = (
-                "You are SpectraChatModel, an expert mass spectrometry assistant. "
-                "Given a MS/MS spectrum with precursor mass and charge, identify the peptide sequence "
-                "by reasoning step-by-step through the y-ion ladder. "
-                "Start by identifying y1 candidates, then extend the y-ion ladder residue by residue of amino acids. "
-                "If the ladder becomes ambiguous or no candidates are found, state clearly that the "
-                "peptide sequence cannot be determined. "
-                "Conclude with the complete predicted peptide sequence if derivable."
-            )
+                    "You are SpectraChatModel, an expert mass spectrometry assistant specializing in "
+                    "de novo peptide sequencing from MS/MS spectra.\n\n"
+                    "Given a spectrum's precursor mass, precursor charge, and list of fragment ion peaks, "
+                    "determine the peptide sequence by reasoning step-by-step through complementary fragment "
+                    "ion ladders:\n"
+                    "1. First, attempt to derive the sequence using the y-ion ladder (C-terminus to N-terminus). "
+                    "For each position, identify the fragment peak, verify its mass against the expected "
+                    "residue mass within tolerance, and compute the residue from the mass difference between "
+                    "consecutive fragments. If the ladder resolves completely, confirm it against the precursor "
+                    "mass and stop.\n"
+                    "2. If gaps remain in the y-ion ladder, attempt the b-ion ladder (N-terminus to C-terminus) "
+                    "the same way. If the b-ion ladder alone resolves completely, confirm it against the "
+                    "precursor mass and stop.\n"
+                    "3. If both ladders have gaps, merge them: for each unresolved b-ion position, check whether "
+                    "the y-ion ladder resolved that same position, and vice versa.\n"
+                    "4. If exactly one residue remains unresolved after merging, recover it by subtracting the "
+                    "known residues and one water molecule from the precursor mass.\n"
+                    "5. When a terminal residue (the first or last position) has no fragment peak, recover it "
+                    "from the adjacent known fragment and the precursor mass rather than reporting it as missing.\n"
+                    "6. If two or more residues remain unresolved after merging, or the recovered mass does not "
+                    "match any residue within tolerance, state clearly that the complete sequence cannot be "
+                    "determined, and report the partial sequence with unresolved positions marked.\n\n"
+                    "Always validate any complete candidate sequence against the precursor mass before reporting "
+                    "it as final. Show your arithmetic explicitly at each step."
+                )
 
 
 # Thse sample input are from /lclhome/apali007/projects/spectra_algorithm/languagemodel/v2/input_data/test_split.json
-sample_input = "Precursor mz: 466.25480 Da, Precursor Charge: 2\nExperimental MS\/MS spectrum (m\/z):\nm\/z 120.552579\nm\/z 120.570772\nm\/z 129.065854\nm\/z 129.065854\nm\/z 130.589496\nm\/z 141.065854\nm\/z 155.081504\nm\/z 158.092403\nm\/z 158.104979\nm\/z 159.067540\nm\/z 175.118952\nm\/z 183.076418\nm\/z 183.112804\nm\/z 200.088472\nm\/z 200.102967\nm\/z 200.102968\nm\/z 200.121160\nm\/z 200.613168\nm\/z 201.105176\nm\/z 201.123369\nm\/z 201.593921\nm\/z 211.107718\nm\/z 228.134267\nm\/z 228.134268\nm\/z 228.599204\nm\/z 228.617397\nm\/z 228.631892\nm\/z 228.644468\nm\/z 228.650085\nm\/z 229.123900\nm\/z 271.140082\nm\/z 271.176467\nm\/z 271.623210\nm\/z 271.632089\nm\/z 271.632089\nm\/z 271.635786\nm\/z 285.155731\nm\/z 285.155732\nm\/z 285.173925\nm\/z 285.647740\nm\/z 288.128326\nm\/z 288.203016\nm\/z 349.170525\nm\/z 349.188717\nm\/z 349.197597\nm\/z 349.221406\nm\/z 349.662532\nm\/z 349.680725\nm\/z 358.175807\nm\/z 358.199617\nm\/z 358.208496\nm\/z 358.208496\nm\/z 358.212193\nm\/z 358.221072\nm\/z 382.208495\nm\/z 382.208496\nm\/z 391.715099\nm\/z 399.169667\nm\/z 399.198659\nm\/z 399.235044\nm\/z 409.233656\nm\/z 414.180566\nm\/z 414.245944\nm\/z 414.271096\nm\/z 417.245609\nm\/z 427.229959\nm\/z 457.240524\nm\/z 516.314023\nm\/z 599.249374\nm\/z 599.285760\nm\/z 599.285760\nm\/z 617.296325\nm\/z 647.354508\nm\/z 670.322874\nm\/z 670.322874\nm\/z 670.359259\nm\/z 670.377018\nm\/z 687.313037\nm\/z 687.349423\nm\/z 698.317788\nm\/z 698.354174\nm\/z 704.375972\nm\/z 715.344337\nm\/z 715.391957\nm\/z 715.409715\nm\/z 715.409715\nm\/z 715.417109\nm\/z 715.434867\nm\/z 817.460036\nAnalyze this spectrum and identify the most likely peptide sequence."
-
+sample_input = "Precursor mz: 667.85479 Da, Precursor Charge: 2\nExperimental MS/MS spectrum (m/z, intensity):" \
+    "\nm/z 147.11246, intensity 0.31000\nm/z 185.05533, intensity 0.10000\nm/z 195.03891, intensity 0.03000\nm/z 212.06584, intensity 0.14000" \
+    "\nm/z 213.05009, intensity 0.12000\nm/z 218.14929, intensity 0.26000\nm/z 230.07646, intensity 1.00000\nm/z 278.11417, intensity 0.02000" \
+    "\nm/z 330.10748, intensity 0.02000\nm/z 331.23291, intensity 0.10000\nm/z 348.11713, intensity 0.13000\nm/z 364.72824, intensity 0.01000" \
+    "\nm/z 375.13028, intensity 0.02000\nm/z 376.11121, intensity 0.08000\nm/z 393.13873, intensity 0.15000\nm/z 405.76367, intensity 0.09000" \
+    "\nm/z 406.26431, intensity 0.02000\nm/z 414.27802, intensity 0.11000\nm/z 419.15717, intensity 0.03000\nm/z 448.76730, intensity 0.02000" \
+    "\nm/z 470.30945, intensity 0.02000\nm/z 471.78757, intensity 0.08000\nm/z 473.13153, intensity 0.04000\nm/z 485.22443, intensity 0.03000" \
+    "\nm/z 487.33368, intensity 0.49000\nm/z 490.15421, intensity 0.04000\nm/z 491.13788, intensity 0.09000\nm/z 493.73444, intensity 0.02000" \
+    "\nm/z 494.22699, intensity 0.11000\nm/z 494.73117, intensity 0.02000\nm/z 502.74188, intensity 0.24000\nm/z 508.16580, intensity 0.18000" \
+    "\nm/z 544.31299, intensity 0.02000\nm/z 544.80511, intensity 0.05000\nm/z 545.29236, intensity 0.06000\nm/z 550.77295, intensity 0.02000" \
+    "\nm/z 553.32050, intensity 0.44000\nm/z 553.82349, intensity 0.14000\nm/z 558.31573, intensity 0.02000\nm/z 559.28375, intensity 0.04000" \
+    "\nm/z 569.37494, intensity 0.03000\nm/z 586.29449, intensity 0.03000\nm/z 586.40192, intensity 0.47000\nm/z 601.17957, intensity 0.02000" \
+    "\nm/z 601.82806, intensity 0.06000\nm/z 610.34058, intensity 0.40000\nm/z 618.21326, intensity 0.02000\nm/z 619.19519, intensity 0.05000" \
+    "\nm/z 636.22620, intensity 0.12000\nm/z 682.45514, intensity 0.04000\nm/z 687.25146, intensity 0.02000\nm/z 699.48553, intensity 0.43000" \
+    "\nm/z 704.29138, intensity 0.02000\nm/z 715.25244, intensity 0.03000\nm/z 731.29834, intensity 0.02000\nm/z 732.28296, intensity 0.06000" \
+    "\nm/z 749.30914, intensity 0.12000\nm/z 796.46094, intensity 0.05000\nm/z 810.51990, intensity 0.16000\nm/z 811.52142, intensity 0.04000" \
+    "\nm/z 827.54382, intensity 0.55000\nm/z 831.35925, intensity 0.03000\nm/z 848.36932, intensity 0.03000\nm/z 924.56531, intensity 0.05000" \
+    "\nm/z 925.55377, intensity 0.08000\nm/z 942.57092, intensity 0.82000\nm/z 959.51770, intensity 0.05000\nm/z 976.49286, intensity 0.01000" \
+    "\nm/z 986.47412, intensity 0.02000\nm/z 987.46826, intensity 0.03000\nm/z 1004.47638, intensity 0.24000\nm/z 1073.55994, intensity 0.02000" \
+    "\nm/z 1087.62561, intensity 0.03000\nm/z 1088.60034, intensity 0.03000\nm/z 1089.56531, intensity 0.11000\nm/z 1090.55603, intensity 0.02000" \
+    "\nm/z 1100.52588, intensity 0.03000\nm/z 1105.63049, intensity 0.29000\nm/z 1106.63342, intensity 0.08000\nm/z 1117.57019, intensity 0.16000" \
+    "\nm/z 1118.56238, intensity 0.04000\nm/z 1160.59924, intensity 0.06000\nm/z 1171.57361, intensity 0.03000\nm/z 1188.59583, intensity 0.32000" \
+    "\nAnalyze this spectrum and identify the most likely peptide sequence."
 # {"input":"Precursor mz: 515.76350 Da, Precursor Charge: 2\nExperimental MS\/MS spectrum (m\/z):\nm\/z 147.112804\nm\/z 169.097154\nm\/z 187.107718\nm\/z 228.099894\nm\/z 235.107719\nm\/z 235.107719\nm\/z 240.134268\nm\/z 258.144832\nm\/z 294.181218\nm\/z 295.140081\nm\/z 327.166296\nm\/z 345.176860\nm\/z 368.160483\nm\/z 378.189771\nm\/z 386.169036\nm\/z 387.195054\nm\/z 393.176861\nm\/z 413.708328\nm\/z 417.172839\nm\/z 434.203410\nm\/z 437.181946\nm\/z 437.181946\nm\/z 441.249632\nm\/z 448.219060\nm\/z 455.192511\nm\/z 457.224342\nm\/z 528.281660\nm\/z 609.266739\nm\/z 627.277304\nm\/z 629.329339\nm\/z 668.340238\nm\/z 686.350803\nm\/z 698.314417\nm\/z 755.372266\nm\/z 767.335881\nm\/z 773.382831\nm\/z 783.367181\nm\/z 785.346446\nm\/z 808.398816\nm\/z 826.409380\nm\/z 844.419945\nm\/z 895.430844\nm\/z 913.441408\nm\/z 931.451973\nAnalyze this spectrum and identify the most likely peptide sequence.",
 #  "output":"Identifying y1 candidates from the given spectrum to build the peptide sequence: \nmz peak at 147.11280 Da. Subtracting water (18.01056 Da) and a proton (1.00728) gives a residue mass of 128.09496 Da, consistent with amino acid K.\nThe observed y1 candidates: K\nAttempting y-ion ladder starting with K as the C-terminal amino acid (y1 = 147.11280 Da):\nThe difference between y2 (294.18122 Da) and y1 (147.11280 Da) is 147.06841 Da, identifying the next residue as F.\nThe difference between y3 (441.24963 Da) and y2 (294.18122 Da) is 147.06841 Da, identifying the next residue as F.\nThe difference between y4 (528.28166 Da) and y3 (441.24963 Da) is 87.03203 Da, identifying the next residue as S.\nThe difference between y5 (629.32934 Da) and y4 (528.28166 Da) is 101.04768 Da, identifying the next residue as T.\nThe difference between y6 (686.35080 Da) and y5 (629.32934 Da) is 57.02146 Da, identifying the next residue as G.\nThe difference between y7 (773.38283 Da) and y6 (686.35080 Da) is 87.03203 Da, identifying the next residue as S.\nThe difference between y8 (844.41995 Da) and y7 (773.38283 Da) is 71.03711 Da, identifying the next residue as A.\nThe difference between y9 (931.45197 Da) and y8 (844.41995 Da) is 87.03203 Da, identifying the next residue as S.\nNo peak found for y10. Using precursor mass (515.76350 Da, charge=2), the singly charged precursor mass is 1030.51972 Da, the mz for ion y9 is 931.45197 Da. The difference between them is 99.06774 Da, which is consistent with amino acid V. The complete sequence is predicted as VSASGTSFFK.",
 #  "peptide":"VSASGTSFFK",
@@ -50,7 +89,7 @@ sample_input = "Precursor mz: 466.25480 Da, Precursor Charge: 2\nExperimental MS
 #  "y_match":true}
 
 def extract_predicted_peptide(prediction):
-    match = re.search(r"The complete sequence is predicted as ([A-Z]+)\.", prediction)
+    match = re.search(r"Final predicted sequence: ([A-Z]+)\.", prediction)
     if match:
         return match.group(1)
     
@@ -175,7 +214,7 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
 
             input_text = spectra_instance.get('input', None)
             ground_truth = spectra_instance.get('peptide', None)
-            y_match = spectra_instance.get('y_match', None)
+            case_label = spectra_instance.get('case_label', None)
             scan_number = spectra_instance.get('scan_number', None)
             raw_file = spectra_instance.get('raw_file', None)
 
@@ -189,7 +228,7 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
                 "input":input_text,
                 "prediction":prediction,
                 "ground_truth": ground_truth,
-                "y_match": y_match,
+                "case_label": case_label,
                 "scan_number": scan_number,
                 "raw_file": raw_file,
             })
