@@ -226,7 +226,14 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
                 traces.append(
                         f"The difference between {ion_type}{i} and {ion_type}{i-1} ( {mass:.5f} - {prev_mz:.5f} = {predicted_aa_mass:.5f} Da) identifies the {ordinal(i)} residue from the {terminal}-terminus as {ladder_residues[i-1]}. "
                     )
-                derived_aa_pos[i-1] = ladder_residues[i-1]   
+                derived_aa_pos[i-1] = ladder_residues[i-1]
+            # else:
+            #     # assign amino acid if prev_mz is none but the peak exists in the labeled dataset. But you cannot compute the difference ss, you just use the labeled peptide position.
+            #     traces.append(
+            #     f"This identifies the {ordinal(i)} residue from the {terminal}-terminus as {ladder_residues[i-1]}. "
+            #         )
+            #     derived_aa_pos[i-1] = ladder_residues[i-1]
+
 
         prev_mz = mass
 
@@ -452,11 +459,13 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra,
     )
 
     if VERBOSE:
-        print(f"initial_meta_data: number of PSM rows: {len(meta_data)}")
-        print(f"initial_meta_data: total unique spectra in raw meta data file: {len(meta_data.groupby(['scan_number', 'raw_file']))}")
-        print(f"initial_meta_data: total unique peptides in raw meta data file: {len(meta_data.groupby(['modified_sequence']))}")
-        print(f"\nintial_annotated_data: total unique spectra in raw annotation file: {len(annot_data.groupby(['scan_number', 'raw_file']))}")
-        print(f"intial_annotated_data: total unique peptides in raw annotation data file: {len(annot_data.groupby(['peptide_sequence']))}")
+        print(f"initial_meta_data: number of PSM rows, len(meta_data): {len(meta_data)}")
+        print(f"initial_meta_data: total unique spectra in raw meta data file, meta_data.groupby(['scan_number', 'raw_file']): {len(meta_data.groupby(['scan_number', 'raw_file']))}")
+        print(f"initial_meta_data: total unique peptides in raw meta data file, len(meta_data.groupby(['modified_sequence'])): {len(meta_data.groupby(['modified_sequence']))}")
+        print(f"initial_meta_data: total unique spectra and peptide pairs in raw meta data file, len(meta_data.groupby(['scan_number', 'raw_file', 'modified_sequence'])): {len(meta_data.groupby(['scan_number', 'raw_file', 'modified_sequence']))}")
+        print(f"\nintial_annotated_data: total unique spectra in raw annotation file, len(annot_data.groupby(['scan_number', 'raw_file'])): {len(annot_data.groupby(['scan_number', 'raw_file']))}")
+        print(f"intial_annotated_data: total unique peptides in raw annotation data file, len(annot_data.groupby(['peptide_sequence'])): {len(annot_data.groupby(['peptide_sequence']))}")
+        print(f"\nintial_annotated_data: total unique spectra and peptide pairs in raw annotation file, len(annot_data.groupby(['scan_number', 'raw_file', 'peptide_sequence'])): {len(annot_data.groupby(['scan_number', 'raw_file', 'peptide_sequence']))}")
 
     # should only contain uppercase letters (excludes PTMs)
     meta_data = meta_data[meta_data['modified_sequence'].apply(is_valid_peptide)]
@@ -637,9 +646,9 @@ if __name__ == "__main__":
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     TOLERANCE = 0.2
     PRECURSOR_TOLERANCE = 0.1
-    VERBOSE = False
-    SAVE_DATASET = True
-    NUM_EXAMPLES = 20000
-    use_cache = True
+    VERBOSE = True
+    SAVE_DATASET = False
+    NUM_EXAMPLES = 1
+    use_cache = False
 
     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA, NUM_EXAMPLES,SAVE_DATASET, use_cache)
