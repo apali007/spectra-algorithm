@@ -64,7 +64,7 @@ def handle_terminal_ion(ion_type, n, prev_mz, precursor_neutral_mass, predicted_
     
     return terminal_ion_trace
 
-def validate_precursor(final_sequence, y_derived, precursor_neutral_mass):
+def validate_precursor(final_sequence, precursor_neutral_mass):
 
     theoretical_mass_with_water = sum(AA_MASSES[r] for r in final_sequence) +  NEUTRAL_LOSS_MASSES['H2O']
     diff = abs(precursor_neutral_mass - theoretical_mass_with_water)
@@ -271,7 +271,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
 
     if not y_has_gap:
         final_sequence = "".join(y_derived)
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, y_derived, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"No need to derive a b-ion ladder as the complete sequence is confirmed. Final predicted sequence: {final_sequence}. ")
         is_match = (label_peptide == final_sequence)
@@ -288,7 +288,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     
     if not b_has_gap:
         final_sequence = "".join(b_derived)
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, b_derived, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"Final predicted sequence: {final_sequence}. ")
         is_match = (label_peptide == final_sequence)
@@ -305,7 +305,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     if gap_count == 0:
         final_sequence_after_handle = "".join(b_derived_after_handle)
         reasoning_trace.append(f"Combining both ladders gives the full predicted sequence: {final_sequence_after_handle}. ")
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, b_derived_after_handle, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"Final predicted sequence: {final_sequence_after_handle}. ")
         is_match = (label_peptide == final_sequence_after_handle)
@@ -332,14 +332,14 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
 
             reasoning_trace.append(f"Combining all resolved positions gives the complete predicted sequence: {final_sequence_after_handle}. ")
 
-            precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, b_derived_after_handle, precursor_neutral_mass)
+            precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, precursor_neutral_mass)
             reasoning_trace.append(precursor_validation_trace)
             reasoning_trace.append(f"Final predicted sequence: {final_sequence_after_handle}. ")
             is_match = (label_peptide == final_sequence_after_handle)
             return is_match, is_precursor_match, final_sequence_after_handle, reasoning_trace, CASE_SINGLE_GAP_RESOLVED
             
         else:
-            final_sequence_after_handle = "".join(aa if aa is not None else '?' for aa in b_derived_after_handle)
+            final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle) 
             reasoning_trace.append(f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. The complete sequence cannot be predicted. ")
             reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
             is_match = (label_peptide == final_sequence_after_handle)
@@ -646,9 +646,9 @@ if __name__ == "__main__":
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     TOLERANCE = 0.2
     PRECURSOR_TOLERANCE = 0.1
-    VERBOSE = True
+    VERBOSE = False
     SAVE_DATASET = False
     NUM_EXAMPLES = 1
-    use_cache = False
+    use_cache = True
 
     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA, NUM_EXAMPLES,SAVE_DATASET, use_cache)
