@@ -15,6 +15,10 @@ def normalize(peptide):
 def has_neutral_loss(text):
     return "neutral loss of" in text
 
+def extract_charge(input_text):
+    match = re.search(r"Precursor Charge: (\d+)", input_text)
+    return int(match.group(1)) if match else None
+
 def evaluate(results_path):
 
     with open(results_path, 'r') as f:        
@@ -33,18 +37,23 @@ def evaluate(results_path):
     nl_totals = Counter()
     nl_matches = Counter()
 
+    precursor_charge_totals = Counter()
+    precursor_charge_matches = Counter()
+
     for item in results:
         total +=1
         ground_truth = item.get('ground_truth')
         prediction = item.get('prediction')
         case_label = item.get('case_label', 'UNKNOWN')
         pep_len = len(ground_truth)
+        charge = extract_charge(item.get('input', ''))
+        used_nl = has_neutral_loss(prediction)
+                
 
         case_totals[case_label] += 1
         pep_len_totals[pep_len] += 1
-
-        used_nl = has_neutral_loss(prediction)
         nl_totals[used_nl] += 1
+        precursor_charge_totals[charge] += 1
 
         predicted_peptide = extract_predicted_peptide(prediction)
 
@@ -57,6 +66,7 @@ def evaluate(results_path):
             case_matches[case_label] += 1
             pep_len_matches[pep_len] += 1
             nl_matches[used_nl] += 1
+            precursor_charge_matches[charge] += 1 
 
     print(f"\n Total: {total}")
     print(f"No prediction extracted (regex miss): {no_extraction} ({100*no_extraction/total:.1f}%)")
@@ -72,7 +82,7 @@ def evaluate(results_path):
     for pep_length in sorted(pep_len_totals):
         p_total = pep_len_totals[pep_length]
         p_match = pep_len_matches[pep_length]
-        print(f"peptide length {pep_length}: {p_match}/{p_total} ({100*p_match/p_total:.1f}%)")
+        print(f" peptide length {pep_length}: {p_match}/{p_total} ({100*p_match/p_total:.1f}%)")
 
     print("\n neutral loss:")
     for used_nl in [True, False]:
@@ -81,6 +91,12 @@ def evaluate(results_path):
         label = "used neutral loss" if used_nl else "no neutral loss"
         if n_total:
             print(f" {label}: {n_match}/{n_total} ({100*n_match/n_total:.1f}%)")
+
+    print("\n precursor charge:")
+    for charge in sorted(precursor_charge_totals, key=lambda x: (x is None, x)):
+        ch_total = precursor_charge_totals[charge]
+        ch_match = precursor_charge_matches[charge]
+        print(f" precursor charge {charge}: {ch_match}/{ch_total} ({100*ch_match/ch_total:.1f}%)")
 
 if __name__ == "__main__":
 
