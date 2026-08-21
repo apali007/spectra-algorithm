@@ -12,6 +12,9 @@ def extract_predicted_peptide(prediction):
 def normalize(peptide):
     return peptide.replace('I','L')
 
+def has_neutral_loss(text):
+    return "neutral loss of" in text
+
 def evaluate(results_path):
 
     with open(results_path, 'r') as f:        
@@ -27,6 +30,9 @@ def evaluate(results_path):
     pep_len_totals = Counter()
     pep_len_matches = Counter()
 
+    nl_totals = Counter()
+    nl_matches = Counter()
+
     for item in results:
         total +=1
         ground_truth = item.get('ground_truth')
@@ -36,6 +42,9 @@ def evaluate(results_path):
 
         case_totals[case_label] += 1
         pep_len_totals[pep_len] += 1
+
+        used_nl = has_neutral_loss(prediction)
+        nl_totals[used_nl] += 1
 
         predicted_peptide = extract_predicted_peptide(prediction)
 
@@ -47,6 +56,7 @@ def evaluate(results_path):
             match +=1
             case_matches[case_label] += 1
             pep_len_matches[pep_len] += 1
+            nl_matches[used_nl] += 1
 
     print(f"\n Total: {total}")
     print(f"No prediction extracted (regex miss): {no_extraction} ({100*no_extraction/total:.1f}%)")
@@ -63,6 +73,14 @@ def evaluate(results_path):
         p_total = pep_len_totals[pep_length]
         p_match = pep_len_matches[pep_length]
         print(f"peptide length {pep_length}: {p_match}/{p_total} ({100*p_match/p_total:.1f}%)")
+
+    print("\n neutral loss:")
+    for used_nl in [True, False]:
+        n_total = nl_totals[used_nl]
+        n_match = nl_matches[used_nl]
+        label = "used neutral loss" if used_nl else "no neutral loss"
+        if n_total:
+            print(f" {label}: {n_match}/{n_total} ({100*n_match/n_total:.1f}%)")
 
 if __name__ == "__main__":
 
