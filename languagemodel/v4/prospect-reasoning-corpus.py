@@ -602,6 +602,9 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         # CASE_CLEAN_Y_ION_LADDER
         # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precusor_match and is_label_match:
 
+        # ALL CASES
+        # if save_dataset and ( case_label in (CASE_UNRESOLVABLE_MULTI_GAP, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH) or (is_label_match and is_precusor_match) ):
+
         if save_dataset:
             dataset.append({
             'input': spectrum_to_input_text(
@@ -646,14 +649,14 @@ if __name__ == "__main__":
 
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/clean_y_ion_prospect_reasoning_dataset.json"
+    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_reasoning_dataset.json"
     CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     TOLERANCE = 0.2
     PRECURSOR_TOLERANCE = 0.1
     VERBOSE = False
-    SAVE_DATASET = False
-    NUM_EXAMPLES = 1
+    SAVE_DATASET = True
+    NUM_EXAMPLES = 30000
     use_cache = True
 
     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA, NUM_EXAMPLES,SAVE_DATASET, use_cache)

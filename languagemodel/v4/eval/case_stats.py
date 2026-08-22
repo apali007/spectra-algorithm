@@ -20,9 +20,10 @@ def show_case_stats(dataset_path):
 
 if __name__ == "__main__":
 
-    # dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect-results-inference-spectra-full.json'
-    # dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_reasoning_dataset_v1.json'
-    dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/clean_y_ion_prospect_reasoning_dataset.json'
+    # dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_reasoning_dataset.json'
+
+    # dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json'
+    dataset_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json'
     
 
     show_case_stats(dataset_path)
