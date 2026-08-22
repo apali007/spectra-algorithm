@@ -598,7 +598,10 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
                 print(f"predicted sequence is correctly matches with the precursor information")
 
         case_counts[case_label] = case_counts.get(case_label, 0) + 1
-            
+
+        # CASE_CLEAN_Y_ION_LADDER
+        # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precusor_match and is_label_match:
+
         if save_dataset:
             dataset.append({
             'input': spectrum_to_input_text(
@@ -643,7 +646,7 @@ if __name__ == "__main__":
 
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_reasoning_dataset_v2.json"
+    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/clean_y_ion_prospect_reasoning_dataset.json"
     CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     TOLERANCE = 0.2
