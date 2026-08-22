@@ -341,9 +341,18 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
             return is_match, is_precursor_match, final_sequence_after_handle, reasoning_trace, CASE_SINGLE_GAP_RESOLVED
             
         else:
-            final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle) 
-            reasoning_trace.append(f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. The complete sequence cannot be predicted. ")
+            final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle)
+            reasoning_trace.append(
+                f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. "
+                f"Since exactly one residue remains unresolved, attempting to recover it from the precursor mass: "
+                f"precursor-derived neutral mass {precursor_neutral_mass:.5f} Da, minus water ({NEUTRAL_LOSS_MASSES['H2O']:.5f} Da), minus the sum of the already-identified residues ({identified_residues} = {sum_identified_residues:.5f} Da), "
+                f"leaves {predicted_aa_mass:.5f} Da, which does not match the mass of any residue within tolerance ({TOLERANCE} Da). "
+                f"The complete sequence cannot be predicted. "
+            )
             reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
+            # final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle) 
+            # reasoning_trace.append(f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. The complete sequence cannot be predicted. ")
+            # reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
             is_match = (label_peptide == final_sequence_after_handle)
             return is_match, False, final_sequence_after_handle, reasoning_trace, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH
 
@@ -603,9 +612,9 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precusor_match and is_label_match:
 
         # ALL CASES
-        # if save_dataset and ( case_label in (CASE_UNRESOLVABLE_MULTI_GAP, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH) or (is_label_match and is_precusor_match) ):
+        if save_dataset and ( case_label in (CASE_UNRESOLVABLE_MULTI_GAP, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH) or (is_label_match and is_precusor_match) ):
 
-        if save_dataset:
+        # if save_dataset:
             dataset.append({
             'input': spectrum_to_input_text(
                 spec['annotation_rows']['experimental_mass'].tolist(), 

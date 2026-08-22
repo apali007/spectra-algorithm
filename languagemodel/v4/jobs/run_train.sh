@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=72:00:00
-#SBATCH --mem=80G
+#SBATCH --mem=100G
 
 source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
 conda activate spectra
