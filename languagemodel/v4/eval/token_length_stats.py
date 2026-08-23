@@ -117,12 +117,12 @@ def get_test_real_input_length_stats(path, label):
     print(f" max: {lengths_sorted[-1]}")
 
 get_train_real_full_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json',
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json',
     "Train set"
 )
 
 get_test_real_input_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
     "Test set"
 )
 

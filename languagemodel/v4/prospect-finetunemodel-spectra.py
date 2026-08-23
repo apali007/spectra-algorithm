@@ -45,11 +45,11 @@ WARMUP_RATIO = 0.05
 
 # OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-prospect"
 
-# PROSPECT 30k all cases reasoning dataset
-TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json"
-TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json"
+# PROSPECT all y-ion clean case reasoning dataset
+TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json"
+TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json"
 
-OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/system_prompt_30k_all_cases_spectra-chat-checkpoints-prospect"
+OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/all_clean_y_ion_case_spectra-chat-checkpoints-prospect"
 
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
