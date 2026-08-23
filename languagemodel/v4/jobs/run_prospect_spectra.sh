@@ -14,5 +14,8 @@ export LD_LIBRARY_PATH=/lclhome/apali007/miniconda3/envs/spectra/lib:$LD_LIBRARY
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 echo "Running on node: $(hostname)"
 
-python prospect-reasoning-corpus.py
+# python prospect-reasoning-corpus.py
+
+python eval/ion_mass_gap.py
+
 # python prospect_practice.py

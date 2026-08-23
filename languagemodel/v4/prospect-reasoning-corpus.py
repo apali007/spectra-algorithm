@@ -503,9 +503,12 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra,
     if VERBOSE:
         print(f"20_peak_filtered_meta_data: number of PSM rows: {len(meta_data)}")
 
+    # Every scan now maps to exactly one peptide by construction in filtered_annot 
     filtered_annot = annot_data.merge(
-        meta_data[['scan_number', 'raw_file']],
-        on=['scan_number', 'raw_file'])
+        meta_data[['scan_number', 'raw_file', 'modified_sequence']],
+        left_on=['scan_number', 'raw_file', 'peptide_sequence'],
+        right_on=['scan_number', 'raw_file', 'modified_sequence']
+    )
 
     unique_triples = filtered_annot[['scan_number', 'raw_file', 'peptide_sequence']].drop_duplicates()
     unique_pairs = filtered_annot[['scan_number', 'raw_file']].drop_duplicates()
