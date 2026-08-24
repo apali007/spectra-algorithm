@@ -20,7 +20,7 @@ for spec in spectra:
 df = pd.DataFrame(rows).sort_values('gap', ascending = False)
 
 meta = pd.read_parquet("/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet")[
-    ['scan_number', 'raw_file', 'modified_sequence', 'mass_analyzer']
+    ['scan_number', 'raw_file', 'modified_sequence', 'mass_analyzer', 'fragmentation']
     ]
 
 df = df.merge(meta, on=['scan_number', 'raw_file', 'modified_sequence'], how='left')

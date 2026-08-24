@@ -16,6 +16,6 @@ echo "Running on node: $(hostname)"
 
 # python prospect-reasoning-corpus.py
 
-python eval/ion_mass_gap.py
+python eval/precursor_mass_gap.py
 
 # python prospect_practice.py
