@@ -6,6 +6,9 @@ import json
 
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-14B-Instruct")
 
+MAX_SEQ_LENGTH = 30000 
+MAX_NEW_TOKENS = 6144
+
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
     'C': 103.00919, 'E': 129.04259, 'Q': 128.05858, 'G': 57.02146,
@@ -66,7 +69,9 @@ SYSTEM_PROMPT = (
     "as final. Show your arithmetic explicitly at every step."
 )
 
-def get_train_real_full_length_stats(path, label):
+def get_real_full_length_stats(path, label):
+
+    print(f"\npath: {path}")
     with open(path) as f:
         data = json.load(f)
 
@@ -89,10 +94,12 @@ def get_train_real_full_length_stats(path, label):
     print(f" 95th pct: {lengths_sorted[int(n*0.95)]}")
     print(f" 99th pct: {lengths_sorted[int(n*0.99)]}")
     print(f" max: {lengths_sorted[-1]}")
-    over_limit = sum(1 for l in lengths if l > 12288)
-    print(f" examples exceeding 12288: {over_limit} ({100*over_limit/n:.2f}%)")
+    over_limit = sum(1 for l in lengths if l > MAX_SEQ_LENGTH)
+    print(f" examples exceeding {MAX_SEQ_LENGTH}: {over_limit} ({100*over_limit/n:.2f}%)")
 
 def get_test_real_input_length_stats(path, label):
+    print(f"\npath: {path}")
+
     with open(path) as f:
         data = json.load(f)
     
@@ -101,6 +108,7 @@ def get_test_real_input_length_stats(path, label):
         messages = [
             {"role": "system", "content":SYSTEM_PROMPT},
             {"role": "user", "content": entry['input']},
+            {"role": "assistant", "content": ""},
         ]
 
         tokens = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True)
@@ -116,13 +124,76 @@ def get_test_real_input_length_stats(path, label):
     print(f" 99th pct: {lengths_sorted[int(n*0.99)]}")
     print(f" max: {lengths_sorted[-1]}")
 
-get_train_real_full_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json',
+
+def get_test_real_output_length_stats(path, label):
+
+    print(f"\npath: {path}")
+
+    with open(path) as f:
+        data = json.load(f)
+    
+    lengths = []
+    for entry in data:
+        messages = [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": ""},
+        {"role": "assistant", "content": entry['output']},
+        ]
+
+        tokens = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True)
+        lengths.append(len(tokens))
+
+    lengths_sorted = sorted(lengths)
+    n = len(lengths_sorted)
+    print(f"\n{label} (n={n}) - REAL chat-template output length:")
+    print(f" min: {lengths_sorted[0]}")
+    print(f" mean: {sum(lengths)/n:.0f}")
+    print(f" median: {lengths_sorted[n//2]}")
+    print(f" 95th pct: {lengths_sorted[int(n*0.95)]}")
+    print(f" 99th pct: {lengths_sorted[int(n*0.99)]}")
+    print(f" max: {lengths_sorted[-1]}")
+    over_limit = sum(1 for l in lengths if l > MAX_NEW_TOKENS)
+    print(f" examples exceeding {MAX_NEW_TOKENS}: {over_limit} ({100*over_limit/n:.2f}%)")
+
+
+# get_real_full_length_stats(
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json',
+#     "Train set"
+# )
+
+# get_real_full_length_stats(
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     "Test set"
+# )
+
+# get_test_real_input_length_stats(
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     "Test set"
+# )
+
+# get_test_real_output_length_stats(
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     "Test set"
+# )
+
+
+
+get_real_full_length_stats(
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json',
     "Train set"
 )
 
-get_test_real_input_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+get_real_full_length_stats(
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
     "Test set"
 )
 
+get_test_real_input_length_stats(
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    "Test set"
+)
+
+get_test_real_output_length_stats(
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    "Test set"
+)
