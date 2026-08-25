@@ -20,6 +20,7 @@ CASES = [
     CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH, CASE_SINGLE_GAP_RESOLVED    
 ]
 
+# constant values from https://github.com/wilhelm-lab/spectrum_fundamentals/blob/development/spectrum_fundamentals/constants.py 
 AA_MASSES = {
     'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
     'C': 103.00919, 'E': 129.04259, 'Q': 128.05858, 'G': 57.02146,
@@ -28,16 +29,41 @@ AA_MASSES = {
     'T': 101.04768, 'W': 186.07931, 'Y': 163.06333, 'V': 99.06841,
 }
 
+AA_MASSES = {
 
-NEUTRAL_LOSS_MASSES = {
-    'H2O': 18.01056,
-    'NH3': 17.02655
+    "A": 71.037114,
+    "R": 156.101111,
+    "N": 114.042927,
+    "D": 115.026943,
+
+    "C": 103.009185,
+    "E": 129.042593,
+    "Q": 128.058578,
+    "G": 57.021464,
+
+    "H": 137.058912,
+    "I": 113.084064,
+    "L": 113.084064,
+    "K": 128.094963,
+
+    "M": 131.040485,
+    "F": 147.068414,
+    "P": 97.052764,
+    "S": 87.032028,
+
+    "T": 101.047679,
+    "W": 186.079313,
+    "Y": 163.063329,
+    "V": 99.068414,
+
 }
 
-# MASS_H2O    = 18.01056
-# MASS_NH3 = 17.02655
-MASS_PROTON =  1.00728
-MASS_C13    = 1.00335 # Mass Difference between C-12 and C-13
+NEUTRAL_LOSS_MASSES = {
+    'H2O': 18.01056467,
+    'NH3': 17.026549105
+}
+
+MASS_PROTON =  1.007276467
 
 def ordinal(n):
     #Convert an integer to its ordinal string: 1 -> '1st', 2 -> '2nd', 11 -> '11th', etc.
