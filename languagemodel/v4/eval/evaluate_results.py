@@ -100,6 +100,6 @@ def evaluate(results_path):
 
 if __name__ == "__main__":
 
-    results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect-results-inference-spectra-full.json'
+    results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/all_clean_y_ion_case_prospect_results-inference-spectra-full.json'
 
     evaluate(results_path)

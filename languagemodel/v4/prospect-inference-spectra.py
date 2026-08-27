@@ -142,10 +142,6 @@ def predict_from_single_spectrum(i, model, tokenizer, spectrum_input):
         return_tensors="pt",
     )
 
-    if inputs_ids.shape[1] + MAX_NEW_TOKENS > MAX_SEQ_LENGTH:
-        print(f"Skipping spectrum {i} as inputs_ids.shape[1] + MAX_NEW_TOKENS > MAX_SEQ_LENGTH")
-        return None
-
     inputs = inputs_ids.to("cuda")
 
     outputs = model.generate(
