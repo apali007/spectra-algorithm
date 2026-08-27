@@ -13,7 +13,7 @@ from unsloth.chat_templates import get_chat_template
 MODEL_ID = "Qwen/Qwen2.5-14B-Instruct"
 
 # Maximum token length per training example
-MAX_SEQ_LENGTH = 20000
+MAX_SEQ_LENGTH = 31210
 
 # Generate up to 6144  tokens
 MAX_NEW_TOKENS = 6144 

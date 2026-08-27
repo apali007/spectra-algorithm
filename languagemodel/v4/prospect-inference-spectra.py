@@ -5,11 +5,11 @@ from unsloth.chat_templates import get_chat_template
 import re
 import os
 
-MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/all_clean_y_ion_case_spectra-chat-checkpoints-prospect/merged_16bit/"
-# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/system_prompt_30k_all_cases_spectra-chat-checkpoints-prospect/merged_16bit/"
+# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/all_clean_y_ion_case_spectra-chat-checkpoints-prospect/merged_16bit/"
+MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/system_prompt_30k_all_cases_spectra-chat-checkpoints-prospect/merged_16bit/"
 
 
-MAX_SEQ_LENGTH = 30000 
+MAX_SEQ_LENGTH = 31210 
 MAX_NEW_TOKENS = 6144
 TEMPERATURE = 0.1
 
@@ -128,19 +128,25 @@ def evaluate(results):
     print(f"\n Total: {total}")
     print(f"Accuracy : {100*match/total:.1f}%")
 
-def predict_from_single_spectrum(model, tokenizer, spectrum_input):
+def predict_from_single_spectrum(i, model, tokenizer, spectrum_input):
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": spectrum_input},
     ]
 
-    inputs = tokenizer.apply_chat_template(
+    inputs_ids = tokenizer.apply_chat_template(
         messages,
         tokenize = True,
         add_generation_prompt=True,
         return_tensors="pt",
-    ).to("cuda")
+    )
+
+    if inputs_ids.shape[1] + MAX_NEW_TOKENS > MAX_SEQ_LENGTH:
+        print(f"Skipping spectrum {i} as inputs_ids.shape[1] + MAX_NEW_TOKENS > MAX_SEQ_LENGTH")
+        return None
+
+    inputs = inputs_ids.to("cuda")
 
     outputs = model.generate(
         input_ids = inputs,
@@ -190,10 +196,13 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
             scan_number = spectra_instance.get('scan_number', None)
             raw_file = spectra_instance.get('raw_file', None)
 
-
-            prediction = predict_from_single_spectrum(
-                model, tokenizer, input_text,
-            )
+            try:
+                prediction = predict_from_single_spectrum(
+                    i, model, tokenizer, input_text,
+                )
+            except ValueError as e:
+                print(f"Skipping spectrum {i}: {e}")
+                prediction = None
 
             results.append({
                 "spectra_id": i,
@@ -257,14 +266,21 @@ def main():
 
     if args.batch:
         num_examples = None
-        is_resume = False
+        is_resume = True
 
         predict_from_batch(model, tokenizer, args.batch, args.output, num_examples, is_resume)
     
     elif args.text:
-        
-        prediction = predict_from_single_spectrum(model, tokenizer, args.text)
-        print(f"OUTPUT:\n{prediction}")
+
+        try:
+            prediction = predict_from_single_spectrum(
+                "the given", model, tokenizer, args.text
+            )
+        except ValueError as e:
+            print(f"Skipping spectrum the given: {e}")
+            prediction = None
+
+        print(f"OUTPUT:\n{prediction}")  
     
 
 if __name__== "__main__":

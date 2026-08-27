@@ -178,10 +178,10 @@ def get_test_real_output_length_stats(path, label):
 
 
 
-get_real_full_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json',
-    "Train set"
-)
+# get_real_full_length_stats(
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json',
+#     "Train set"
+# )
 
 get_real_full_length_stats(
     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
