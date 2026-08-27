@@ -10,7 +10,7 @@ def extract_predicted_peptide(prediction):
     return None
     
 def normalize(peptide):
-    return peptide.replace('I','L')
+    return peptide.replace('I', 'L').replace('N', 'D')
 
 def has_neutral_loss(text):
     return "neutral loss of" in text
