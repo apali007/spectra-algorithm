@@ -166,9 +166,11 @@ def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_exam
         processed_ids = set()
         if output_path and os.path.exists(output_path):
             with open(output_path, 'r') as f:
-                results = json.load(f)
+                loaded_results = json.load(f)
+            results = [item for item in loaded_results if item['prediction'] is not None]
             processed_ids = {item['spectra_id'] for item in results}
             print(f"Resuming: {len(processed_ids)} already processed")
+            print(f"Dropping {len(loaded_results) - len(results)} previously-skipped spectra for retry")
 
     with open(input_batch_path, 'r') as f:
 

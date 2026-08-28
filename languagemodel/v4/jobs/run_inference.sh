@@ -16,9 +16,13 @@ export PYTHONUNBUFFERED=1
 
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half2.json \
+# --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half2.json
+
 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
---batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half2.json \
---output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half2.json
+--batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half1.json \
+--output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half1.json
 
 # CUDA_VISIBLE_DEVICES=0 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
 # --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_half1.json \
