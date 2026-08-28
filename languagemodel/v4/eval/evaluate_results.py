@@ -10,6 +10,8 @@ AA_MASSES = {
     'T': 101.04768, 'W': 186.07931, 'Y': 163.06333, 'V': 99.06841,
 }
 
+VALID_RESIDUES = set(AA_MASSES.keys())
+
 def extract_predicted_peptide(prediction):
     pep_level_match = re.search(r"Final predicted sequence: ([A-Z]+)\.", prediction)
     if pep_level_match:
@@ -27,32 +29,39 @@ def extract_charge(input_text):
     pep_level_match = re.search(r"Precursor Charge: (\d+)", input_text)
     return int(pep_level_match.group(1)) if pep_level_match else None
 
+def mass(aa):
+    return AA_MASSES.get(aa, float('nan'))
+
+def has_invalid_residues(predicted_peptide):
+    return any(aa not in VALID_RESIDUES for aa in predicted_peptide)
+
 def evaluate_aa_level_performance(aa_level_match, aa_level_ground_truth_total, aa_level_pred_total, ground_truth, predicted_peptide):
     ground_truth_pep_length = len(ground_truth)
     pred_pep_length = len(predicted_peptide)
     aa_level_ground_truth_total += ground_truth_pep_length
-    pred_pep_length_total += pred_pep_length
+    aa_level_pred_total += pred_pep_length
     ground_truth_residues = list(ground_truth)
     predicted_residues = list(predicted_peptide)
 
     for i in range(ground_truth_pep_length):
 
-        theoretical_mass_match = abs(AA_MASSES[ground_truth_residues[i]] - AA_MASSES[predicted_residues[i]]) < 0.1
-        if not theoretical_mass_match:
+        if i>= pred_pep_length or abs(mass(ground_truth_residues[i]) - mass(predicted_residues[i])) >= 0.1:
             continue
 
-        prefix_sum_label = sum(AA_MASSES[j] for j in ground_truth_residues[:i])
-        suffix_sum_label = sum(AA_MASSES[j] for j in ground_truth_residues[i:ground_truth_pep_length])
-        prefix_sum_pred = sum(AA_MASSES[j] for j in predicted_residues[:i])
-        suffix_sum_pred = sum(AA_MASSES[j] for j in predicted_residues[i:ground_truth_pep_length])
+        prefix_sum_label = sum(mass(j) for j in ground_truth_residues[:i])
+        suffix_sum_label = sum(mass(j) for j in ground_truth_residues[i:ground_truth_pep_length])
+        prefix_sum_pred = sum(mass(j) for j in predicted_residues[:i])
+        suffix_sum_pred = sum(mass(j) for j in predicted_residues[i:ground_truth_pep_length])
 
         prefix_match = abs(prefix_sum_label - prefix_sum_pred) <= 0.5
         suffix_match = abs(suffix_sum_label - suffix_sum_pred) <= 0.5
         aa_level_match += 1 if (prefix_match or suffix_match) else 0 
 
-    return aa_level_match, aa_level_ground_truth_total, pred_pep_length_total
+    return aa_level_match, aa_level_ground_truth_total, aa_level_pred_total
              
 def evaluate(results_path):
+
+    print(results_path)
 
     with open(results_path, 'r') as f:        
         results = json.load(f)
@@ -61,7 +70,9 @@ def evaluate(results_path):
     pep_level_match = 0
     aa_level_ground_truth_total = 0
     aa_level_match = 0
+    aa_level_pred_total = 0
     no_extraction = 0
+    invalid_residue = 0
 
     case_totals = Counter()
     case_matches = Counter()
@@ -96,6 +107,9 @@ def evaluate(results_path):
             no_extraction += 1 
             continue
 
+        if has_invalid_residues(predicted_peptide):
+            invalid_residue +=1
+
         aa_level_match, aa_level_ground_truth_total, aa_level_pred_total   = evaluate_aa_level_performance(aa_level_match, aa_level_ground_truth_total, aa_level_pred_total, ground_truth, predicted_peptide)
 
         if normalize(predicted_peptide) == normalize(ground_truth):
@@ -105,9 +119,16 @@ def evaluate(results_path):
             nl_matches[used_nl] += 1
             precursor_charge_matches[charge] += 1 
 
+    aa_level_recall = aa_level_match/aa_level_ground_truth_total if aa_level_ground_truth_total else 0.0
+    aa_level_precision = aa_level_match/aa_level_pred_total if aa_level_pred_total else 0.0
+    
     print(f"\n Total: {pep_level_total}")
     print(f"No prediction extracted (regex miss): {no_extraction} ({100*no_extraction/pep_level_total:.1f}%)")
-    print(f"Accuracy : {100*pep_level_match/pep_level_total:.1f}%")
+    print(f"No of peptides with invalid residue in prediction: {invalid_residue} ({100*invalid_residue/pep_level_total:.1f}%)")
+    print(f"Peptide level Accuracy : {100*pep_level_match/pep_level_total:.1f}%")
+    print(f"Amino acid level recall : {100*aa_level_recall:.1f}%")
+    print(f"Amino acid level Precision : {100*aa_level_precision:.1f}%")
+
 
     print("\n case_label:")
     for case_label in sorted(case_totals):
@@ -138,5 +159,6 @@ def evaluate(results_path):
 if __name__ == "__main__":
 
     results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/all_clean_y_ion_case_prospect_results-inference-spectra-full.json'
+    # results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect-results-inference-spectra-full.json'
 
     evaluate(results_path)
