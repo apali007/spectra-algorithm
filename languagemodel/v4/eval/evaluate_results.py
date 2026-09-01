@@ -77,7 +77,7 @@ def evaluate(results_path):
     print(f"\nTotal: {total}")
 
     unresolvable_total = 0
-    pep_level_total = 0
+    resolvable_total = 0
     pep_level_match = 0
     aa_level_ground_truth_total = 0
     aa_level_match = 0
@@ -87,6 +87,8 @@ def evaluate(results_path):
 
     case_totals = Counter()
     case_matches = Counter()
+
+    case_no_extraction = Counter()
 
     pep_len_totals = Counter()
     pep_len_matches = Counter()
@@ -105,7 +107,7 @@ def evaluate(results_path):
             unresolvable_total += 1
             continue
 
-        pep_level_total +=1
+        resolvable_total +=1
         ground_truth = item.get('ground_truth')
         prediction = item.get('prediction')
         pep_len = len(ground_truth)
@@ -118,6 +120,7 @@ def evaluate(results_path):
 
         if predicted_peptide is None:
             no_extraction += 1 
+            case_no_extraction[case_label] += 1
             continue
 
         used_nl = has_neutral_loss(prediction)
@@ -136,10 +139,10 @@ def evaluate(results_path):
             precursor_charge_matches[charge] += 1 
 
 
-    pred_extracted_total = pep_level_total - no_extraction
+    pred_extracted_total = resolvable_total - no_extraction
     peptide_level_precision = pep_level_match/pred_extracted_total if pred_extracted_total else 0.0
-    peptide_level_coverage = pred_extracted_total/pep_level_total
-    peptide_level_total_pred_accuracy = pep_level_match/pep_level_total
+    peptide_level_coverage = pred_extracted_total/resolvable_total
+    peptide_level_total_pred_accuracy = pep_level_match/resolvable_total
     # aa_level_recall = aa_level_match/aa_level_ground_truth_total if aa_level_ground_truth_total else 0.0
     aa_level_precision = aa_level_match/aa_level_pred_total if aa_level_pred_total else 0.0
 
@@ -150,10 +153,18 @@ def evaluate(results_path):
         print(f" {case_label}: {case_label_count} ({100*case_label_count/total:.1f}%)")
 
     print(f"\nUnresolvable instances ({CASE_UNRESOLVABLE_MULTI_GAP}, {CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH} are excluded in the results below): {unresolvable_total} ({100*unresolvable_total/total:.1f}%)")
-    print(f"\n Total Resolvable instances: {pep_level_total}")
-    print(f"No prediction extracted (regex miss): {no_extraction} ({100*no_extraction/pep_level_total:.1f}%)")
-    print(f"No of peptides with invalid residue in prediction: {invalid_residue} ({100*invalid_residue/pep_level_total:.1f}%)")
-    print(f"Peptide level Coverage : {100*peptide_level_coverage:.1f}%")
+    print(f"\n Total Resolvable instances: {resolvable_total} ({100*resolvable_total/total:.1f}%)")
+    print(f"\nNo prediction extracted (regex miss): {no_extraction} ({100*no_extraction/resolvable_total:.1f}%)")
+
+    print(f"\nNo extraction Case distribution:")
+
+    for case_label in sorted(case_no_extraction):
+
+        case_label_count = case_no_extraction[case_label]
+        print(f" {case_label}: {case_label_count} ({100*case_label_count/resolvable_total:.1f}%)")
+
+    print(f"\nNo of peptides with invalid residue in prediction: {invalid_residue} ({100*invalid_residue/resolvable_total:.1f}%)")
+    print(f"Peptide level Coverage : {pred_extracted_total} ({100*peptide_level_coverage:.1f}%) ")
     print(f"Peptide level Precision : {100*peptide_level_precision:.1f}%")
     print(f"Peptide level total predicted accuracy: {100*peptide_level_total_pred_accuracy:.1f}%")
 
@@ -188,8 +199,8 @@ def evaluate(results_path):
         print(f" precursor charge {charge}: {ch_match}/{ch_total} ({100*ch_match/ch_total:.1f}%)")
 
 if __name__ == "__main__":
-    results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-full.json'
+    # results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-full.json'
     # results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/all_clean_y_ion_case_prospect_results-inference-spectra-full.json'
-    # results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect-results-inference-spectra-full.json'
+    results_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect-results-inference-spectra-full.json'
 
     evaluate(results_path)
