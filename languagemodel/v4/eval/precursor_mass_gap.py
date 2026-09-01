@@ -1,13 +1,33 @@
 import pickle, pandas as pd
 
 AA = {
-    'A': 71.03711, 'R': 156.10111, 'N': 114.04293, 'D': 115.02694,
-    'C': 103.00919, 'E': 129.04259, 'Q': 128.05858, 'G': 57.02146,
-    'H': 137.05891, 'I': 113.08406, 'L': 113.08406, 'K': 128.09496,
-    'M': 131.04049, 'F': 147.06841, 'P': 97.05276,  'S': 87.03203,
-    'T': 101.04768, 'W': 186.07931, 'Y': 163.06333, 'V': 99.06841,
+    "A": 71.037114,
+    "R": 156.101111,
+    "N": 114.042927,
+    "D": 115.026943,
+
+    "C": 103.009185,
+    "E": 129.042593,
+    "Q": 128.058578,
+    "G": 57.021464,
+
+    "H": 137.058912,
+    "I": 113.084064,
+    "L": 113.084064,
+    "K": 128.094963,
+
+    "M": 131.040485,
+    "F": 147.068414,
+    "P": 97.052764,
+    "S": 87.032028,
+
+    "T": 101.047679,
+    "W": 186.079313,
+    "Y": 163.063329,
+    "V": 99.068414,
+
 }
-H2O, PROTON = 18.01056, 1.00728
+H2O, PROTON = 18.01056467, 1.007276467
 
 spectra = pickle.load(open("/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl", "rb"))
 
@@ -40,5 +60,5 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 
 print(df.head(50).to_string(index=False))
-print("\nPrecursor gap summary by mass analyzer:")
-print(df.groupby('mass_analyzer')['gap'].describe())
+print("\nPrecursor worst case gap summary by mass analyzer:")
+print(df.groupby('mass_analyzer')['gap'].describe(percentiles=[0.10, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999]))

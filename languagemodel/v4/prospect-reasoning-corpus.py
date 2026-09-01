@@ -6,56 +6,14 @@ import glob
 import os
 import pickle
 
-# Case labels for derive_peptide outcomes
-CASE_CLEAN_B_ION_LADDER = "CASE_CLEAN_B_ION_LADDER"
-CASE_CLEAN_Y_ION_LADDER = "CASE_CLEAN_Y_ION_LADDER"
-CASE_COMPLEMENTARY_GAPS = "CASE_COMPLEMENTARY_GAPS"
-CASE_UNRESOLVABLE_MULTI_GAP = "CASE_UNRESOLVABLE_MULTI_GAP"
-CASE_SINGLE_GAP_RESOLVED = "CASE_SINGLE_GAP_RESOLVED"
-CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH = "CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH"
-
-
-CASES = [
-    CASE_CLEAN_B_ION_LADDER, CASE_CLEAN_Y_ION_LADDER, CASE_COMPLEMENTARY_GAPS, CASE_UNRESOLVABLE_MULTI_GAP, 
-    CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH, CASE_SINGLE_GAP_RESOLVED    
-]
-
-# constant values from https://github.com/wilhelm-lab/spectrum_fundamentals/blob/development/spectrum_fundamentals/constants.py 
-AA_MASSES = {
-
-    "A": 71.037114,
-    "R": 156.101111,
-    "N": 114.042927,
-    "D": 115.026943,
-
-    "C": 103.009185,
-    "E": 129.042593,
-    "Q": 128.058578,
-    "G": 57.021464,
-
-    "H": 137.058912,
-    "I": 113.084064,
-    "L": 113.084064,
-    "K": 128.094963,
-
-    "M": 131.040485,
-    "F": 147.068414,
-    "P": 97.052764,
-    "S": 87.032028,
-
-    "T": 101.047679,
-    "W": 186.079313,
-    "Y": 163.063329,
-    "V": 99.068414,
-
-}
-
-NEUTRAL_LOSS_MASSES = {
-    'H2O': 18.01056467,
-    'NH3': 17.026549105
-}
-
-MASS_PROTON =  1.007276467
+from constants import (
+    AA_MASSES, NEUTRAL_LOSS_MASSES, MASS_PROTON,
+    TOLERANCE_BY_ANALYZER, PRECURSOR_TOLERANCE, DEFAULT_PEAK_TOLERANCE,
+    CASE_CLEAN_B_ION_LADDER, CASE_CLEAN_Y_ION_LADDER,
+    CASE_COMPLEMENTARY_GAPS, CASE_UNRESOLVABLE_MULTI_GAP,
+    CASE_SINGLE_GAP_RESOLVED, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH,
+    CASES
+)
 
 def ordinal(n):
     #Convert an integer to its ordinal string: 1 -> '1st', 2 -> '2nd', 11 -> '11th', etc.
@@ -118,7 +76,7 @@ def handle_ion_gaps(b_derived, y_derived, label_peptide, n):
     return b_seq_str, b_derived, ion_gap_trace
 
 
-def is_mass_verified(i , ion_type, mass , ladder_residues):
+def is_mass_verified(i , ion_type, mass , ladder_residues, peak_tolerance):
     theoretical_mass = sum(AA_MASSES[r] for r in ladder_residues[:i])
     
     if ion_type == 'y':
@@ -127,7 +85,7 @@ def is_mass_verified(i , ion_type, mass , ladder_residues):
         theoretical_mass += MASS_PROTON
 
     difference = abs(mass - theoretical_mass)
-    is_valid = difference < TOLERANCE
+    is_valid = difference < peak_tolerance
 
     if VERBOSE:
         print(f"{ion_type}{i}, diff: {difference} | is_valid: {is_valid}")
@@ -188,7 +146,7 @@ def handle_first_position(mz, ion_type, ladder_residues):
     
     return trace
 
-def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge):
+def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge, peak_tolerance):
     residues = list(label_peptide)
     n = len(residues)
     if ion_type == 'y':
@@ -217,7 +175,7 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
                     predicted_aa_mass = precursor_neutral_mass - NEUTRAL_LOSS_MASSES['H2O'] - prev_mz + MASS_PROTON
 
                 diff = abs(predicted_aa_mass - AA_MASSES[ladder_residues[i-1]])
-                if diff < TOLERANCE:
+                if diff < peak_tolerance:
                     traces.append(handle_terminal_ion(ion_type, n, prev_mz, precursor_neutral_mass, predicted_aa_mass, ladder_residues[i-1]))
                     derived_aa_pos[i-1] = ladder_residues[i-1] 
                 else:
@@ -230,7 +188,7 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
         mz, charge, nl = peak_information
         trace_charge_nl, mass = handle_charge_nl(ion_type, mz, charge, nl, i)
 
-        if not is_mass_verified(i, ion_type, mass, ladder_residues):
+        if not is_mass_verified(i, ion_type, mass, ladder_residues, peak_tolerance):
             traces.append(f"No fragment ion was found for {ion_type}{i}. ")
             prev_mz = None
             continue
@@ -244,7 +202,7 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
             if prev_mz is not None:
                 predicted_aa_mass = mass-prev_mz
                 traces.append(
-                        f"The difference between {ion_type}{i} and {ion_type}{i-1} ( {mass:.5f} - {prev_mz:.5f} = {predicted_aa_mass:.5f} Da) identifies the {ordinal(i)} residue from the {terminal}-terminus as {ladder_residues[i-1]}. "
+                        f"The difference between {ion_type}{i} and {ion_type}{i-1} ({mass:.5f} - {prev_mz:.5f} = {predicted_aa_mass:.5f} Da) identifies the {ordinal(i)} residue from the {terminal}-terminus as {ladder_residues[i-1]}. "
                     )
                 derived_aa_pos[i-1] = ladder_residues[i-1]
             # else:
@@ -267,21 +225,33 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
         
     return derived_aa_pos, traces
 
-def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charge):
+def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charge, mass_analyzer):
     label_residues = list(label_peptide)
     precursor_neutral_mass = precursor_mz * precursor_charge - precursor_charge * MASS_PROTON
     n = len(label_peptide)
+
+    peak_tolerance = TOLERANCE_BY_ANALYZER.get(mass_analyzer, DEFAULT_PEAK_TOLERANCE)
+
     if VERBOSE:
         print(f"Length of the peptide: {n}")
         print(f"precursor_mz: {precursor_mz:.5f}")
         print(f"precursor_mz: {precursor_charge}")
+        print(f"precursor_tolerance: {PRECURSOR_TOLERANCE}")
+        print(f"mass_analyzer: {mass_analyzer}, peak tolerance: {peak_tolerance}")
+        
     reasoning_trace = []
     annotation_lookup = build_annotation_lookup(annotation_rows)
 
     reasoning_trace.append("Analyzing spectra for the y-ion and b-ion ladder to predict the peptide sequence, using the given precursor information. ")
+    reasoning_trace.append(f"This spectrum was acquired on a {mass_analyzer} analyzer, so a fragment mass tolerance of "
+                           f"{peak_tolerance:.5f} Da is used for peak verification. ")
+
+    if VERBOSE:
+        print(f"This spectrum was acquired on a {mass_analyzer} analyzer, so a fragment mass tolerance of "
+                           f"{peak_tolerance:.5f} Da is used for peak verification. ")
 
     reasoning_trace.append("First, trying to derive the sequence using the y-ion ladder (C-terminus to N-terminus): ")
-    y_derived, y_traces = extend_ladder('y', annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge)
+    y_derived, y_traces = extend_ladder('y', annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge, peak_tolerance)
     reasoning_trace.append('\n'.join(y_traces))
 
     y_seq_str = format_ladder_sequence_dash(y_derived)
@@ -298,7 +268,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
         return is_match, is_precursor_match, final_sequence, reasoning_trace, CASE_CLEAN_Y_ION_LADDER
 
     reasoning_trace.append("Next, trying to derive the sequence using the b-ion ladder (N-terminus to C-terminus): ")
-    b_derived, b_traces = extend_ladder('b', annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge) 
+    b_derived, b_traces = extend_ladder('b', annotation_lookup, label_peptide, precursor_neutral_mass, precursor_charge, peak_tolerance) 
     reasoning_trace.append('\n'.join(b_traces))
 
     b_seq_str = format_ladder_sequence_dash(b_derived)
@@ -338,7 +308,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
         identified_residues = '+'.join(aa for aa in b_derived_after_handle if aa is not None)
         predicted_aa_mass = precursor_neutral_mass - sum_identified_residues - NEUTRAL_LOSS_MASSES['H2O']
         diff = abs(predicted_aa_mass - AA_MASSES[aa_gap])
-        if diff < TOLERANCE:
+        if diff < peak_tolerance:
             incomplete_sequence = format_ladder_sequence(b_derived_after_handle) 
             reasoning_trace.append(
             f"Combining both ladders gives the incomplete predicted sequence: {incomplete_sequence}. "
@@ -364,13 +334,10 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
                 f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. "
                 f"Since exactly one residue remains unresolved, attempting to recover it from the precursor mass: "
                 f"precursor-derived neutral mass {precursor_neutral_mass:.5f} Da, minus water ({NEUTRAL_LOSS_MASSES['H2O']:.5f} Da), minus the sum of the already-identified residues ({identified_residues} = {sum_identified_residues:.5f} Da), "
-                f"leaves {predicted_aa_mass:.5f} Da, which does not match the mass of any residue within tolerance ({TOLERANCE} Da). "
+                f"leaves {predicted_aa_mass:.5f} Da, which does not match the mass of any residue within tolerance ({peak_tolerance} Da). "
                 f"The complete sequence cannot be predicted. "
             )
             reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
-            # final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle) 
-            # reasoning_trace.append(f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. The complete sequence cannot be predicted. ")
-            # reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
             is_match = (label_peptide == final_sequence_after_handle)
             return is_match, False, final_sequence_after_handle, reasoning_trace, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH
 
@@ -390,10 +357,10 @@ def filter_top_peaks(mz, intensity, top_n):
 
     return mz_array[top_indices].tolist()
 
-def spectrum_to_input_text(mz_list, intensity_list, precursor_mz, precursor_charge):
+def spectrum_to_input_text(mz_list, intensity_list, precursor_mz, precursor_charge, mass_analyzer):
     unique_peaks = sorted(set(zip(mz_list, intensity_list)), key=lambda p: p[0])
     # peaks = sorted(zip(mz_list, intensity_list), key=lambda p: p[0])
-    lines = [f"Precursor mz: {precursor_mz:.5f} Da, Precursor Charge: {precursor_charge}"]
+    lines = [f"Precursor mz: {precursor_mz:.5f} Da, Precursor Charge: {precursor_charge}, Mass Analyzer: {mass_analyzer}"]
     lines += ["Experimental MS/MS spectrum (m/z, intensity):"]
     lines += [f"m/z {mz:.5f}, intensity {intensity:.5f}" for mz, intensity in unique_peaks]
     lines.append("Analyze this spectrum and identify the most likely peptide sequence.")
@@ -558,6 +525,7 @@ def load_prospect(annotation_data_path, meta_data_path, cache_path, max_spectra,
             'peptide' : peptide,
             'precursor_mz': row.precursor_mz,
             'precursor_charge': int(row.precursor_charge),
+            'mass_analyzer': row.mass_analyzer,
             'annotation_rows': scan_annot,
             'scan_number': scan,
             'raw_file': raw_file,
@@ -596,8 +564,6 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         if VERBOSE:
             print(f"\n=====NEW PEPTIDE=====")
             print(f"label Peptide: {peptide}")
-            print(f"tolerance: {TOLERANCE}")
-            print(f"precursor_tolerance: {PRECURSOR_TOLERANCE}")
             print(f"scan number: {spec['scan_number']}")
             print(f"raw file: {spec['raw_file']}")
 
@@ -605,7 +571,8 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
             spec['annotation_rows'],
             spec['peptide'],
             spec['precursor_mz'],
-            spec['precursor_charge']
+            spec['precursor_charge'],
+            spec['mass_analyzer']
         )
 
         complete_resoning_trace = '\n'.join(reasoning_trace)
@@ -641,7 +608,8 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
                 spec['annotation_rows']['experimental_mass'].tolist(), 
                 spec['annotation_rows']['intensity'].tolist(), 
                 spec['precursor_mz'], 
-                spec['precursor_charge']),
+                spec['precursor_charge'],
+                spec['mass_analyzer']),
             'output': complete_resoning_trace,
             'peptide': peptide,
             'scan_number': spec['scan_number'],
@@ -649,7 +617,8 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
             'pred_seq': predicted_sequence,
             'is_label_match': is_label_match,
             'is_precusor_match': is_precusor_match,
-            'case_label': case_label
+            'case_label': case_label,
+            'mass_analyzer': spec['mass_analyzer']
             })
         
             # Store correct peptides
@@ -679,14 +648,13 @@ if __name__ == "__main__":
 
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_reasoning_dataset_v3.json"
+    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_mass_analyzer_aware_prospect_reasoning_dataset.json"
     CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
-    TOLERANCE = 0.2
-    PRECURSOR_TOLERANCE = 0.1
+    CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/mass_analyzer_all_spectra_prospect_cache.pkl"
     VERBOSE = False
     SAVE_DATASET = True
-    NUM_EXAMPLES = None
+    NUM_EXAMPLES = 30000
     use_cache = True
 
-    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA, NUM_EXAMPLES,SAVE_DATASET, use_cache)
+    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER, NUM_EXAMPLES,SAVE_DATASET, use_cache)

@@ -30,7 +30,7 @@ print(df.head(50).to_string(index=False))
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 
-print("\nGap summary by mass analyzer:")
-print(df.groupby('mass_analyzer')['gap'].describe())
+print("\n Fragment Worst Case Gap summary by mass analyzer:")
+print(df.groupby('mass_analyzer')['gap'].describe(percentiles=[0.10, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999]))
 
 print(f"\nrows before merge: {len(rows)}, after merge: {len(df)}")
