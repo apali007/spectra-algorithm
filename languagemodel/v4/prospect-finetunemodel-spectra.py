@@ -268,7 +268,7 @@ def main():
          },
         {"role": "user", "content": SAMPLE_INPUT},
     ]
-    
+
     # converts message to token IDS. 
     inputs = tokenizer.apply_chat_template(
         messages,
@@ -279,7 +279,7 @@ def main():
         # returns a pyTorch tensor
         return_tensors="pt",
         # moves to GPU
-    ).to("cuda")
+    ).to("cuda") 
     
     out = model.generate(
         input_ids = inputs,
