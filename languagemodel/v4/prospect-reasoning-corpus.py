@@ -46,8 +46,15 @@ def validate_precursor(final_sequence, precursor_neutral_mass):
 
     theoretical_mass_with_water = sum(AA_MASSES[r] for r in final_sequence) +  NEUTRAL_LOSS_MASSES['H2O']
     diff = abs(precursor_neutral_mass - theoretical_mass_with_water)
+    is_valid = diff <= PRECURSOR_TOLERANCE
 
-    if diff > PRECURSOR_TOLERANCE:
+    return is_valid, diff, theoretical_mass_with_water
+
+def final_precursor_check(final_sequence, precursor_neutral_mass):
+
+    is_precursor_valid, diff, theoretical_mass_with_water = validate_precursor(final_sequence, precursor_neutral_mass)
+
+    if not is_precursor_valid:
         return "", False
     else:
         trace = (f"Validating against the precursor mass: Theoretical mass of {final_sequence} (sum of residue masses plus one water molecule): {theoretical_mass_with_water:.5f} Da. "
@@ -173,15 +180,15 @@ def extend_ladder(ion_type, annotation_lookup, label_peptide, precursor_neutral_
                     predicted_aa_mass = precursor_neutral_mass - prev_mz + MASS_PROTON
                 else:
                     predicted_aa_mass = precursor_neutral_mass - NEUTRAL_LOSS_MASSES['H2O'] - prev_mz + MASS_PROTON
-
-                diff = abs(predicted_aa_mass - AA_MASSES[ladder_residues[i-1]])
-                if diff < peak_tolerance:
+                is_precursor_validated, _ , _ = validate_precursor(label_peptide, precursor_neutral_mass)
+                if is_precursor_validated:
                     traces.append(handle_terminal_ion(ion_type, n, prev_mz, precursor_neutral_mass, predicted_aa_mass, ladder_residues[i-1]))
                     derived_aa_pos[i-1] = ladder_residues[i-1] 
                 else:
                     traces.append(f"No fragment ion was found for {ion_type}{i}. ")
             else:
                 traces.append(f"No fragment ion was found for {ion_type}{i}. ")
+
             prev_mz = None
             continue
 
@@ -261,7 +268,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
 
     if not y_has_gap:
         final_sequence = "".join(y_derived)
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = final_precursor_check(final_sequence, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"No need to derive a b-ion ladder as the complete sequence is confirmed. Final predicted sequence: {final_sequence}. ")
         is_match = (label_peptide == final_sequence)
@@ -278,7 +285,7 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     
     if not b_has_gap:
         final_sequence = "".join(b_derived)
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = final_precursor_check(final_sequence, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"Final predicted sequence: {final_sequence}. ")
         is_match = (label_peptide == final_sequence)
@@ -295,20 +302,20 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
     if gap_count == 0:
         final_sequence_after_handle = "".join(b_derived_after_handle)
         reasoning_trace.append(f"Combining both ladders gives the full predicted sequence: {final_sequence_after_handle}. ")
-        precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, precursor_neutral_mass)
+        precursor_validation_trace, is_precursor_match = final_precursor_check(final_sequence_after_handle, precursor_neutral_mass)
         reasoning_trace.append(precursor_validation_trace)
         reasoning_trace.append(f"Final predicted sequence: {final_sequence_after_handle}. ")
         is_match = (label_peptide == final_sequence_after_handle)
         return is_match, is_precursor_match, final_sequence_after_handle, reasoning_trace, CASE_COMPLEMENTARY_GAPS
-
+    
     if gap_count == 1:
         gap_pos = gap_indices[0]
         aa_gap = label_residues[gap_pos]
         sum_identified_residues = sum(AA_MASSES[aa] for aa in b_derived_after_handle if aa is not None)
         identified_residues = '+'.join(aa for aa in b_derived_after_handle if aa is not None)
         predicted_aa_mass = precursor_neutral_mass - sum_identified_residues - NEUTRAL_LOSS_MASSES['H2O']
-        diff = abs(predicted_aa_mass - AA_MASSES[aa_gap])
-        if diff < peak_tolerance:
+        is_precursor_validated, _ , _ = validate_precursor(label_peptide, precursor_neutral_mass)
+        if is_precursor_validated:
             incomplete_sequence = format_ladder_sequence(b_derived_after_handle) 
             reasoning_trace.append(
             f"Combining both ladders gives the incomplete predicted sequence: {incomplete_sequence}. "
@@ -322,21 +329,15 @@ def derive_peptide(annotation_rows, label_peptide, precursor_mz, precursor_charg
 
             reasoning_trace.append(f"Combining all resolved positions gives the complete predicted sequence: {final_sequence_after_handle}. ")
 
-            precursor_validation_trace, is_precursor_match = validate_precursor(final_sequence_after_handle, precursor_neutral_mass)
+            precursor_validation_trace, is_precursor_match = final_precursor_check(final_sequence_after_handle, precursor_neutral_mass)
             reasoning_trace.append(precursor_validation_trace)
             reasoning_trace.append(f"Final predicted sequence: {final_sequence_after_handle}. ")
             is_match = (label_peptide == final_sequence_after_handle)
             return is_match, is_precursor_match, final_sequence_after_handle, reasoning_trace, CASE_SINGLE_GAP_RESOLVED
             
         else:
-            final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle)
-            reasoning_trace.append(
-                f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. "
-                f"Since exactly one residue remains unresolved, attempting to recover it from the precursor mass: "
-                f"precursor-derived neutral mass {precursor_neutral_mass:.5f} Da, minus water ({NEUTRAL_LOSS_MASSES['H2O']:.5f} Da), minus the sum of the already-identified residues ({identified_residues} = {sum_identified_residues:.5f} Da), "
-                f"leaves {predicted_aa_mass:.5f} Da, which does not match the mass of any residue within tolerance ({peak_tolerance} Da). "
-                f"The complete sequence cannot be predicted. "
-            )
+            final_sequence_after_handle = format_ladder_sequence(b_derived_after_handle) 
+            reasoning_trace.append(f"Combining both ladders gives the incomplete predicted sequence: {final_sequence_after_handle}. The complete sequence cannot be predicted. ")
             reasoning_trace.append(f"No final sequence is reported for this spectrum. ")
             is_match = (label_peptide == final_sequence_after_handle)
             return is_match, False, final_sequence_after_handle, reasoning_trace, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH
@@ -556,6 +557,7 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
     count_precursor_match = 0
     dataset = []
     case_counts = {}
+    n_not_saved = 0
 
     for spec in spectra:
         total += 1
@@ -600,32 +602,36 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precusor_match and is_label_match:
 
         # # ALL CASES
-        if save_dataset and ( case_label in (CASE_UNRESOLVABLE_MULTI_GAP, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH) or (is_label_match and is_precusor_match) ):
+        if save_dataset:
+            if case_label == CASE_UNRESOLVABLE_MULTI_GAP or (is_label_match and is_precusor_match):
 
-        # if save_dataset:
-            dataset.append({
-            'input': spectrum_to_input_text(
-                spec['annotation_rows']['experimental_mass'].tolist(), 
-                spec['annotation_rows']['intensity'].tolist(), 
-                spec['precursor_mz'], 
-                spec['precursor_charge'],
-                spec['mass_analyzer']),
-            'output': complete_resoning_trace,
-            'peptide': peptide,
-            'scan_number': spec['scan_number'],
-            'raw_file': spec['raw_file'],
-            'pred_seq': predicted_sequence,
-            'is_label_match': is_label_match,
-            'is_precusor_match': is_precusor_match,
-            'case_label': case_label,
-            'mass_analyzer': spec['mass_analyzer']
-            })
-        
-            # Store correct peptides
-            if total % 1000 == 0:
-                with open(output_path, 'w') as f:
-                    json.dump(dataset, f, indent=2)
-                print(f"Progress: {total} processed")
+            # if save_dataset:
+                dataset.append({
+                'input': spectrum_to_input_text(
+                    spec['annotation_rows']['experimental_mass'].tolist(), 
+                    spec['annotation_rows']['intensity'].tolist(), 
+                    spec['precursor_mz'], 
+                    spec['precursor_charge'],
+                    spec['mass_analyzer']),
+                'output': complete_resoning_trace,
+                'peptide': peptide,
+                'scan_number': spec['scan_number'],
+                'raw_file': spec['raw_file'],
+                'pred_seq': predicted_sequence,
+                'is_label_match': is_label_match,
+                'is_precusor_match': is_precusor_match,
+                'case_label': case_label,
+                'mass_analyzer': spec['mass_analyzer']
+                })
+            
+                # Store correct peptides
+                if total % 1000 == 0:
+                    with open(output_path, 'w') as f:
+                        json.dump(dataset, f, indent=2)
+                    print(f"Progress: {total} processed")
+
+            else:
+                n_not_saved += 1
 
     print("\nResults:")
     print(f"Total: {total}")
@@ -638,7 +644,8 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         print(f"{case_label}: {count} ({100*count/total:.1f}%)")
 
     if save_dataset:
-        print(f"Dataset size: {len(dataset)}")
+        print(f"Dataset size: {len(dataset)} ({100*len(dataset)/total:.1f}%)")
+        print(f"not saved instances: {n_not_saved} ({100*n_not_saved/total:.1f}%)")
 
         with open(output_path, 'w') as f:
             json.dump(dataset, f, indent=2)
@@ -648,13 +655,13 @@ if __name__ == "__main__":
 
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_mass_analyzer_aware_prospect_reasoning_dataset.json"
+    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/mass_analyzer_aware_prospect_reasoning_dataset.json"
     CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
     CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/mass_analyzer_all_spectra_prospect_cache.pkl"
     VERBOSE = False
     SAVE_DATASET = True
-    NUM_EXAMPLES = 30000
+    NUM_EXAMPLES = None
     use_cache = True
 
     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER, NUM_EXAMPLES,SAVE_DATASET, use_cache)

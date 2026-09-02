@@ -39,12 +39,6 @@ LEARNING_RATE = 2e-4
 # Warmup gradually increases the learning rate at the start of training to stabalize it.
 WARMUP_RATIO = 0.05
 
-# PROSPECT reasoning dataset
-# TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_train.json"
-# TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_test.json"
-
-# OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/spectra-chat-checkpoints-v4-prospect"
-
 # PROSPECT all y-ion clean case reasoning dataset
 TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json"
 TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json"
@@ -53,12 +47,7 @@ OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/chec
 
 
 from constants import (
-    AA_MASSES, NEUTRAL_LOSS_MASSES, MASS_PROTON,
-    TOLERANCE_BY_ANALYZER, PRECURSOR_TOLERANCE,
-    CASE_CLEAN_B_ION_LADDER, CASE_CLEAN_Y_ION_LADDER,
-    CASE_COMPLEMENTARY_GAPS, CASE_UNRESOLVABLE_MULTI_GAP,
-    CASE_SINGLE_GAP_RESOLVED, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH,
-    CASES, SYSTEM_PROMPT, SAMPLE_INPUT
+    SYSTEM_PROMPT, SAMPLE_INPUT
 )
 
 TOLERANCE = 0.2
@@ -189,30 +178,6 @@ def main():
         # Print loss to terminal every 10 training steps
         logging_steps = 10,
 
-
-        # evaluate on the test set and save a check point after every epoch
-        # eval_strategy = "epoch",
-        #checkpoint log
-        
-        # training at a step
-        # {'loss': 0.9992, 'grad_norm': 0.35, 'learning_rate': 7.77e-05, 'epoch': 0.89}
-        # loss - how wrong the model. Lower the better
-        # grad_norm - how big the weight updates were
-        # learning_rate - the learning rate at this point
-        # epoch - how much percentage through epoch 1
-
-        # Evaluation results of that step
-        # {'eval_loss': 0.778, 'eval_runtime': 7.8, 'eval_samples_per_second': 1.28, 'epoch': 1.0}
-        # eval_loss - how wrong the model was on the batch of examples it never trained on. Lower than train loss it a good sign
-        # eval_samples_per_second - processed how many examples per second during evaluation
-        # epoch - end of epoch 1
-
-        # Final training summary
-        # {'eval_loss': 0.778, 'eval_runtime': 7.8, 'eval_samples_per_second': 1.28, 'epoch': 1.0}
-        # training_runtime - entire training took in seconds
-        # train_samples_per_second - average loss across all training steps
-        # epoch - completed 1 fill epoch
-
         # This means save a checkpoint after every epoch
         # save_strategy = "epoch",
         save_strategy = "no",
@@ -303,24 +268,7 @@ def main():
          },
         {"role": "user", "content": SAMPLE_INPUT},
     ]
-
-    # language model cannot read text directly. It only understands numbers. So, the tokenizer's jobs is to convert the text into numbers and numbers back to text.
-    # "peptide sequence" → [79, 485, 9867, 1234]
-
-    # <|im_start|>: Start of a message turn
-    # <|im_end|>: End of a message turn
-    # <eos>: End of sequence, model should stop generating
-    # <pad>: Padding, ignore this position
-
-    # When you train, you process multiple examples at once. But each example has a different length.
-    # Example 1: [1, 5, 8, 3] (4 tokens) 
-    # Example 2: [2, 7, 9, 1, 4, 6, 8]  (7 tokens)
     
-    # The model needs them all to be the same length. So you pad the shorter ones with a special padding token.
-    # Example 1: [1, 5, 8, 3, PAD, PAD, PAD]
-    # Example 2: [2, 7, 9, 1, 4,   6,   8  ]
-
-
     # converts message to token IDS. 
     inputs = tokenizer.apply_chat_template(
         messages,
