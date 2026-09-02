@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=spectra_inference
-#SBATCH --output=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/inference_%j.log
-#SBATCH --error=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/inference_%j.err
+#SBATCH --output=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/%j.log
+#SBATCH --error=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/%j.err
 #SBATCH --partition=compute
 #SBATCH --gres=gpu:1
 #SBATCH --time=72:00:00
@@ -15,6 +15,11 @@ export LD_LIBRARY_PATH=/lclhome/apali007/miniconda3/envs/spectra/lib:$LD_LIBRARY
 export PYTHONUNBUFFERED=1
 
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
+
+RUN_NAME="inference_${SLURM_JOB_ID}_$(date +%Y%m%d_%H%M%S)"
+mkdir -p logs/$RUN_NAME
+
+trap 'mv logs/_staging/${SLURM_JOB_ID}.log logs/$RUN_NAME/inference.log 2>/dev/null; mv logs/_staging/${SLURM_JOB_ID}.err logs/$RUN_NAME/inference.err 2>/dev/null' EXIT
 
 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
 --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_half2.json \

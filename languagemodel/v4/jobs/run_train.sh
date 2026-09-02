@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=spectra_train
-#SBATCH --output=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/train_%j.log
-#SBATCH --error=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/train_%j.err
+#SBATCH --output=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/%j.log
+#SBATCH --error=/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/%j.err
 #SBATCH --partition=compute
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -16,13 +16,13 @@ export PYTHONUNBUFFERED=1
 
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 
-python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/train.py --epochs 1
+# Run name ties together logs/, checkpoints/, and this job's SLURM ID
+RUN_NAME="train_${SLURM_JOB_ID}_$(date +%Y%m%d_%H%M%S)"
+mkdir -p logs/$RUN_NAME
 
-# python finetunemodel-spectra.py --data /lclhome/apali007/projects/spectra_algorithm/output/reasoning_dataset_correct_instances_TUM_third_pool_1_01_01_annotation.json --epochs 1
+# Ensure the staged SLURM logs get moved into the run folder no matter how the job exits
+trap 'mv logs/_staging/${SLURM_JOB_ID}.log logs/$RUN_NAME/train.log 2>/dev/null; mv logs/_staging/${SLURM_JOB_ID}.err logs/$RUN_NAME/train.err 2>/dev/null' EXIT
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/archive/finetunemodel-spectra-v4.py --epochs 1
-
-# merging LORA weights and full weights of QWEN instruct model
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/scripts/merge_only.py
-
-
+python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/train.py \
+  --epochs 1 \
+  --output_dir /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/$RUN_NAME
