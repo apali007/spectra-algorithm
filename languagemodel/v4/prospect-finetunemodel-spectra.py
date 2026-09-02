@@ -279,7 +279,7 @@ def main():
         # returns a pyTorch tensor
         return_tensors="pt",
         # moves to GPU
-    ).to("cuda") 
+    ).to("cuda")
     
     out = model.generate(
         input_ids = inputs,
