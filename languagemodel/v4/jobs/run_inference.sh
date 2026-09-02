@@ -16,37 +16,37 @@ export PYTHONUNBUFFERED=1
 
 cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 
-python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
---batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half2.json \
+python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+--batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_half2.json \
 --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half2.json
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
-# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half1.json \
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_half1.json \
 # --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half1.json
 
-# CUDA_VISIBLE_DEVICES=0 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
-# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_half1.json \
+# CUDA_VISIBLE_DEVICES=0 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_half1.json \
 # --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/all_clean_y_ion_case_prospect_results-inference-spectra-half1.json &
 
-# CUDA_VISIBLE_DEVICES=1 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
-# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_half2.json \
+# CUDA_VISIBLE_DEVICES=1 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_half2.json \
 # --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/all_clean_y_ion_case_prospect_results-inference-spectra-half2.json &
 
-# CUDA_VISIBLE_DEVICES=0 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
-# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half1.json \
+# CUDA_VISIBLE_DEVICES=0 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_half1.json \
 # --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half1.json &
 
-# CUDA_VISIBLE_DEVICES=1 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py \
-# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_half2.json \
+# CUDA_VISIBLE_DEVICES=1 python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py \
+# --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_half2.json \
 # --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_all_cases_prospect_results-inference-spectra-half2.json &
 
 # wait
 
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/prospect-inference-spectra.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_results-inference-spectra.json
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/src/inference.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/prospect_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/prospect_results-inference-spectra.json
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-0-OVERLAP.json
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/archive/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-0-OVERLAP.json
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_10_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-10-OVERLAP.json
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/archive/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/overlap_10_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-10-OVERLAP.json
 
-# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/overlap_20_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-20-OVERLAP.json
+# python /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/archive/inference-spectra-v4.py --batch /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/overlap_20_reasoning_dataset_test.json --output /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/results-inference-spectra-v4-20-OVERLAP.json
