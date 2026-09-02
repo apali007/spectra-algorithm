@@ -1,8 +1,8 @@
 import json
 from collections import Counter
 
-train_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_train.json'
-test_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/prospect_reasoning_dataset_test.json'
+train_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/prospect_reasoning_dataset_train.json'
+test_path = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/prospect_reasoning_dataset_test.json'
 
 with open(train_path) as f:
     train = json.load(f)

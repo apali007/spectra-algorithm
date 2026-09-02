@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 
-spectra = pickle.load(open("/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl", "rb"))
+spectra = pickle.load(open("/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/all_spectra_prospect_cache.pkl", "rb"))
 
 rows = []
 for spec in spectra:

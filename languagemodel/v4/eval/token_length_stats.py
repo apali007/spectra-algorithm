@@ -157,43 +157,43 @@ def get_test_real_output_length_stats(path, label):
 
 
 # get_real_full_length_stats(
-#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json',
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_train.json',
 #     "Train set"
 # )
 
 # get_real_full_length_stats(
-#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
 #     "Test set"
 # )
 
 # get_test_real_input_length_stats(
-#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
 #     "Test set"
 # )
 
 # get_test_real_output_length_stats(
-#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_test.json',
 #     "Test set"
 # )
 
 
 
 # get_real_full_length_stats(
-#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_train.json',
+#     '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_train.json',
 #     "Train set"
 # )
 
 get_real_full_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_test.json',
     "Test set"
 )
 
 get_test_real_input_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_test.json',
     "Test set"
 )
 
 get_test_real_output_length_stats(
-    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/30k_all_cases_prospect_reasoning_dataset_test.json',
+    '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/30k_all_cases_prospect_reasoning_dataset_test.json',
     "Test set"
 )
