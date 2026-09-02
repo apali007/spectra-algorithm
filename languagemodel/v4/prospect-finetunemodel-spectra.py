@@ -40,8 +40,8 @@ LEARNING_RATE = 2e-4
 WARMUP_RATIO = 0.05
 
 # PROSPECT all y-ion clean case reasoning dataset
-TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_train.json"
-TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_clean_y_ion_case_prospect_reasoning_dataset_test.json"
+TRAIN_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_train.json"
+TEST_SET_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_test.json"
 
 OUTPUT_DIR = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/all_clean_y_ion_case_spectra-chat-checkpoints-prospect"
 
