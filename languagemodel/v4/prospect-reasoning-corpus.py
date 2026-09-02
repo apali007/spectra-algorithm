@@ -656,9 +656,9 @@ if __name__ == "__main__":
     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
     OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/mass_analyzer_aware_prospect_reasoning_dataset.json"
-    CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/100_prospect_cache.pkl"
-    CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/all_spectra_prospect_cache.pkl"
-    CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/input_data/mass_analyzer_all_spectra_prospect_cache.pkl"
+    CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/100_prospect_cache.pkl"
+    CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/all_spectra_prospect_cache.pkl"
+    CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/mass_analyzer_all_spectra_prospect_cache.pkl"
     VERBOSE = False
     SAVE_DATASET = True
     NUM_EXAMPLES = None
