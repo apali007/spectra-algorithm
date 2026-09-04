@@ -1,5 +1,5 @@
 """
-Central configuration for the ProteoRift fine-tuning pipeline.
+Central configuration for the mass spectrometry proteomics reasoning-corpus fine-tuning pipeline.
 
 Keeping every hyperparameter and path in one dataclass (instead of scattered
 module-level constants) makes it possible to:
@@ -17,7 +17,7 @@ from typing import Optional
 @dataclass
 class Config:
     # --- Model ---
-    model_id: str = "Qwen/Qwen2.5-14B-Instruct"
+    model_id: str = "unsloth/qwen2.5-14b-instruct-unsloth-bnb-4bit"
     max_seq_length: int = 31210
     max_new_tokens: int = 6144
     temperature: float = 0.1
