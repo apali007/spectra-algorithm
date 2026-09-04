@@ -5,6 +5,7 @@ import pandas as pd
 import glob
 import os
 import pickle
+import argparse
 
 from constants import (
     AA_MASSES, NEUTRAL_LOSS_MASSES, MASS_PROTON,
@@ -651,17 +652,50 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
             json.dump(dataset, f, indent=2)
         print(f"Saved {len(dataset)} training examples to {output_path}")
 
+# python src/reasoning_corpus.py --num_examples 10000 --output_path output/quick_test.json
 if __name__ == "__main__":
 
-    annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
-    meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
-    OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/40k_mass_analyzer_aware_prospect_reasoning_dataset.json"
-    CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/100_prospect_cache.pkl"
-    CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/all_spectra_prospect_cache.pkl"
-    CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/mass_analyzer_all_spectra_prospect_cache.pkl"
-    VERBOSE = False
-    SAVE_DATASET = True
-    NUM_EXAMPLES = 40000
-    use_cache = True
+    parser = argparse.ArgumentParser(description="Generate the reasoning corpus from PROSPECT data")
+    parser.add_argument("--annotation_data_path",
+                         default="/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool")
+    parser.add_argument("--meta_data_path",
+                         default="/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet")
+    parser.add_argument("--output_path",
+                         default="/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/40k_mass_analyzer_aware_prospect_reasoning_dataset.json")
+    parser.add_argument("--cache_path",
+                         default="/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/mass_analyzer_all_spectra_prospect_cache.pkl")
+    parser.add_argument("--num_examples", type=int, default=0,
+                         help="Number of spectra to keep in the output dataset. 0 (default) means all.")
+    parser.add_argument("--no_save", action="store_true",
+                         help="Process spectra without writing a dataset file (stats-only run).")
+    parser.add_argument("--no_cache", action="store_true",
+                         help="Ignore/regenerate the cache instead of reusing it.")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
 
-    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER, NUM_EXAMPLES,SAVE_DATASET, use_cache)
+    annotation_data_path = args.annotation_data_path
+    meta_data_path = args.meta_data_path
+    OUTPUT_PATH = args.output_path
+    CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = args.cache_path
+    VERBOSE = args.verbose
+    SAVE_DATASET = not args.no_save
+    NUM_EXAMPLES = args.num_examples if args.num_examples > 0 else None
+    use_cache = not args.no_cache
+
+    process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER, NUM_EXAMPLES, SAVE_DATASET, use_cache)
+
+
+    # if __name__ == "__main__":
+
+#     annotation_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool"
+#     meta_data_path = "/lclhome/apali007/projects/spectra_algorithm/prospect/data/TUM_third_pool_meta_data.parquet"
+#     OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/40k_mass_analyzer_aware_prospect_reasoning_dataset.json"
+#     CACHE_PATH_100 = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/100_prospect_cache.pkl"
+#     CACHE_PATH_ALL_SPECTRA = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/all_spectra_prospect_cache.pkl"
+#     CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/cache/mass_analyzer_all_spectra_prospect_cache.pkl"
+#     VERBOSE = False
+#     SAVE_DATASET = True
+#     NUM_EXAMPLES = 40000
+#     use_cache = True
+
+#     process_prospect(annotation_data_path, meta_data_path, OUTPUT_PATH, CACHE_PATH_ALL_SPECTRA_MASS_ANALYZER, NUM_EXAMPLES,SAVE_DATASET, use_cache)
