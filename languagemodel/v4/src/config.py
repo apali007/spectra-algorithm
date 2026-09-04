@@ -35,7 +35,7 @@ class Config:
     # --- Training ---
     epochs: int = 3
     per_device_batch_size: int = 1
-    grad_accum_steps: int = 8
+    grad_accum_steps: int = 4
     learning_rate: float = 2e-4
     lr_scheduler_type: str = "cosine"
     warmup_ratio: float = 0.05
@@ -59,7 +59,7 @@ class Config:
     train_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_train.json"
     val_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_val.json"
     test_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_test.json"
-    
+
     # --- Output ---
     output_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/default_run"
 

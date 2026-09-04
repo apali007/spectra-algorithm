@@ -3,6 +3,8 @@ from datasets import load_dataset
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer, SFTConfig
 from unsloth.chat_templates import get_chat_template, train_on_responses_only
+import os
+import torch
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
@@ -51,6 +53,9 @@ def build_argparser(cfg: Config) -> argparse.ArgumentParser:
 
 def main():
 
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    torch.cuda.set_device(local_rank)
+
     cfg = Config()
 
     parser = build_argparser(cfg)
@@ -68,7 +73,8 @@ def main():
         model_name = cfg.model_id,
         max_seq_length = cfg.max_seq_length,
         dtype = None,
-        load_in_4bit = not cfg.full_finetune
+        load_in_4bit = not cfg.full_finetune,
+        device_map = {"": local_rank},
     )
 
     model.config.use_cache = False
@@ -144,12 +150,6 @@ def main():
         response_part = "<|im_start|>assistant\n",
     )
 
-    """Save the exact config used for this run, so the checkpoint dir is
-    self-describing later (which dataset, which prompt-adjacent settings,
-    which hyperparamters produced this model)."""
-
-    cfg.save(f"{cfg.output_dir}/run_config.json")
-
     stats = trainer.train()
 
     final_dir = cfg.output_dir + "/final"
@@ -172,6 +172,13 @@ def main():
     """
 
     if trainer.is_world_process_zero():
+
+        """
+        Save the exact config used for this run, so the checkpoint dir is
+        self-describing later (which dataset, which prompt-adjacent settings,
+        which hyperparamters produced this model).
+        """
+        cfg.save(f"{cfg.output_dir}/run_config.json")
 
         if cfg.push_to_hub:
             if cfg.full_finetune:
