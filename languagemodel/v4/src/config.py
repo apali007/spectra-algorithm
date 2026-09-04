@@ -56,9 +56,10 @@ class Config:
     # not something we set in config. Left as a comment marker for now.
 
     # --- Data paths ---
-    train_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_train.json"
-    test_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/all_clean_y_ion_case_prospect_reasoning_dataset_test.json"
-
+    train_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_train.json"
+    val_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_val.json"
+    test_set_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed/40k_mass_analyzer_aware_test.json"
+    
     # --- Output ---
     output_dir: str = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/default_run"
 

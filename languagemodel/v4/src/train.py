@@ -8,7 +8,7 @@ from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
 
 def load_and_format(cfg: Config, tokenizer):
-    """Loads train/test JSON into chat-formatted text the model expects."""
+    """Loads train/val/test JSON into chat-formatted text the model expects."""
 
     def _format(example):
         messages = [
@@ -25,12 +25,12 @@ def load_and_format(cfg: Config, tokenizer):
         }
 
     train_raw = load_dataset("json", data_files = cfg.train_set_dir, split="train")
-    test_raw = load_dataset("json", data_files = cfg.test_set_dir, split="train")
+    val_raw = load_dataset("json", data_files=cfg.val_set_dir, split="train")
 
     train_formatted = train_raw.map(_format, remove_columns=train_raw.column_names)
-    test_formatted = test_raw.map(_format, remove_columns=test_raw.column_names)
+    val_formatted = val_raw.map(_format, remove_columns=val_raw.column_names)
 
-    return train_formatted, test_formatted
+    return train_formatted, val_formatted
 
 
 def build_argparser(cfg: Config) -> argparse.ArgumentParser:
@@ -44,7 +44,7 @@ def build_argparser(cfg: Config) -> argparse.ArgumentParser:
     parser.add_argument("--lr", type=float, default=cfg.learning_rate)
     parser.add_argument("--output_dir", default=cfg.output_dir)
     parser.add_argument("--train_set_dir", default=cfg.train_set_dir)
-    parser.add_argument("--test_set_dir", default=cfg.test_set_dir)
+    parser.add_argument("--val_set_dir", default=cfg.val_set_dir)
     parser.add_argument("--push_to_hub", default=cfg.push_to_hub)
 
     return parser
@@ -61,7 +61,7 @@ def main():
     cfg.learning_rate = args.lr
     cfg.output_dir = args.output_dir
     cfg.train_set_dir = args.train_set_dir
-    cfg.test_set_dir = args.test_set_dir
+    cfg.val_set_dir = args.val_set_dir
     cfg.push_to_hub = args.push_to_hub
 
     model, tokenizer = FastLanguageModel.from_pretrained(
