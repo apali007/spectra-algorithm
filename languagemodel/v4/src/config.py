@@ -21,6 +21,7 @@ class Config:
     max_seq_length: int = 31210
     max_new_tokens: int = 6144
     temperature: float = 0.1
+    inference_batch_size: int = 4
 
     # --- LoRA ---
     lora_r: int = 16
@@ -48,7 +49,7 @@ class Config:
     eval_strategy: str = "epoch"
     save_strategy: str = "epoch"
     save_total_limit: int = 2
-    load_best_model_at_end: bool = True
+    load_best_model_at_end: bool = False
 
     # --- Multi-GPU (see next step) ---
     # Effective batch size = per_device_batch_size * grad_accum_steps * num_gpus.

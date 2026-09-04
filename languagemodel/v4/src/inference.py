@@ -1,86 +1,96 @@
 import argparse
 import json
+import re
+from datetime import datetime
+
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
-import re
-import os
 
-# MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/all_clean_y_ion_case_spectra-chat-checkpoints-prospect/merged_16bit/"
-MODEL_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/checkpoints/system_prompt_30k_all_cases_spectra-chat-checkpoints-prospect/merged_16bit/"
+from config import Config
+from constants import SYSTEM_PROMPT, SAMPLE_INPUT
 
-
-MAX_SEQ_LENGTH = 31210 
-MAX_NEW_TOKENS = 6144
-TEMPERATURE = 0.1
-
-from constants import (
-    AA_MASSES, NEUTRAL_LOSS_MASSES, MASS_PROTON,
-    TOLERANCE_BY_ANALYZER, PRECURSOR_TOLERANCE,
-    CASE_CLEAN_B_ION_LADDER, CASE_CLEAN_Y_ION_LADDER,
-    CASE_COMPLEMENTARY_GAPS, CASE_UNRESOLVABLE_MULTI_GAP,
-    CASE_SINGLE_GAP_RESOLVED, CASE_UNRESOLVABLE_SINGLE_GAP_MASS_MISMATCH,
-    CASES, SYSTEM_PROMPT, SAMPLE_INPUT
-)
-
-TOLERANCE = 0.2
-
-
-AA_MASS_TABLE_TEXT = "\n".join(
-    f"{aa}: {mass:.5f} Da" for aa, mass in AA_MASSES.items()
-)
 
 def extract_predicted_peptide(prediction):
     match = re.search(r"Final predicted sequence: ([A-Z]+)\.", prediction)
     if match:
         return match.group(1)
-    
     return None
-    
+
+
 def normalize(peptide):
-    return peptide.replace('I','L')
+    return peptide.replace('I', 'L') if peptide else peptide
+
 
 def evaluate(results):
-    total = 0
-    match =0
+    """Reports two numbers, since they answer different questions:
+    - attempted accuracy: correctness among spectra the model produced a
+      final sequence for (what the old script computed)
+    - overall accuracy: correctness over ALL spectra, treating "no final
+      sequence" as an incorrect/unresolved prediction, not a skip.
+    Overall accuracy is the fair number for comparing against Casanovo and
+    other baselines, since it doesn't let "declined to answer" cases quietly
+    inflate the score.
+    """
+    total = len(results)
+    attempted = 0
+    match_count = 0
 
     for item in results:
-        total +=1
         ground_truth = item.get('ground_truth')
         prediction = item.get('prediction')
 
-        predicted_peptide = extract_predicted_peptide(prediction)
+        predicted_peptide = extract_predicted_peptide(prediction) if prediction else None
 
         if predicted_peptide is None:
             continue
 
-        if normalize(predicted_peptide) == normalize(ground_truth):
-            match +=1
+        attempted += 1
+        if ground_truth and normalize(predicted_peptide) == normalize(ground_truth):
+            match_count += 1
 
-    print(f"\n Total: {total}")
-    print(f"Accuracy : {100*match/total:.1f}%")
+    print(f"\nTotal spectra: {total}")
+    print(f"Attempted (model produced a final sequence): {attempted} ({100*attempted/total:.1f}% coverage)" if total else "Attempted: 0")
 
-def predict_from_single_spectrum(i, model, tokenizer, spectrum_input):
+    if attempted > 0:
+        print(f"Attempted accuracy: {100*match_count/attempted:.1f}%  ({match_count}/{attempted})")
+    else:
+        print("Attempted accuracy: n/a (no predictions attempted)")
 
+    if total > 0:
+        print(f"Overall accuracy:   {100*match_count/total:.1f}%  ({match_count}/{total})")
+    else:
+        print("Overall accuracy: n/a (empty result set)")
+
+    return {
+        "total": total,
+        "attempted": attempted,
+        "correct": match_count,
+        "attempted_accuracy_pct": (100 * match_count / attempted) if attempted else None,
+        "overall_accuracy_pct": (100 * match_count / total) if total else None,
+    }
+
+
+def predict_from_single_spectrum(model, tokenizer, cfg: Config, spectrum_input):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": spectrum_input},
     ]
 
-    inputs_ids = tokenizer.apply_chat_template(
+    input_ids = tokenizer.apply_chat_template(
         messages,
-        tokenize = True,
+        tokenize=True,
         add_generation_prompt=True,
         return_tensors="pt",
     )
 
-    inputs = inputs_ids.to("cuda")
+    inputs = input_ids.to("cuda")
 
     outputs = model.generate(
-        input_ids = inputs,
-        max_new_tokens = MAX_NEW_TOKENS,
-        temperature = TEMPERATURE,
-        do_sample = True,
-        pad_token_id= tokenizer.eos_token_id
+        input_ids=inputs,
+        max_new_tokens=cfg.max_new_tokens,
+        temperature=cfg.temperature,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
     )
 
     prediction = tokenizer.decode(
@@ -90,127 +100,176 @@ def predict_from_single_spectrum(i, model, tokenizer, spectrum_input):
     return prediction
 
 
-def predict_from_batch(model, tokenizer, input_batch_path, output_path, num_examples, is_resume):
-     
+def predict_from_spectrum_batch(model, tokenizer, cfg: Config, spectrum_inputs):
+    """Generates predictions for a LIST of spectra in one forward pass.
+
+    Left-padding is required here (unlike training, which uses right-padding):
+    for decoder-only generation, padding must sit before the real tokens so
+    that every sequence in the batch ends at the same position and generation
+    continues correctly from there. Because of left-padding, every sequence's
+    prompt occupies the same number of columns after tokenization, so a single
+    slice index (input_len) correctly separates prompt from generated tokens
+    for every item in the batch at once.
+    """
+    texts = [
+        tokenizer.apply_chat_template(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": spectrum_input},
+            ],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        for spectrum_input in spectrum_inputs
+    ]
+
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    encoded = tokenizer(
+        texts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=cfg.max_seq_length,
+    ).to("cuda")
+
+    outputs = model.generate(
+        input_ids=encoded["input_ids"],
+        attention_mask=encoded["attention_mask"],
+        max_new_tokens=cfg.max_new_tokens,
+        temperature=cfg.temperature,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+    input_len = encoded["input_ids"].shape[1]
+    predictions = [
+        tokenizer.decode(outputs[j][input_len:], skip_special_tokens=True)
+        for j in range(len(texts))
+    ]
+    return predictions
+
+
+def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_path, num_examples):
     results = []
-    if is_resume:
-        processed_ids = set()
-        if output_path and os.path.exists(output_path):
-            with open(output_path, 'r') as f:
-                loaded_results = json.load(f)
-            results = [item for item in loaded_results if item['prediction'] is not None]
-            processed_ids = {item['spectra_id'] for item in results}
-            print(f"Resuming: {len(processed_ids)} already processed")
-            print(f"Dropping {len(loaded_results) - len(results)} previously-skipped spectra for retry")
 
     with open(input_batch_path, 'r') as f:
-
         data = json.load(f)
-        
-        for i, spectra_instance in enumerate(data, 1):
-    
-            if num_examples is not None and i > num_examples:
-                break
 
-            if is_resume:
-                if i in processed_ids:
-                    print(f"Skipping spectrum {i} (already done).")
-                    continue
-            
-            print(f"Processing spectrum {i} ...")
+    if num_examples is not None:
+        data = data[:num_examples]
 
-            input_text = spectra_instance.get('input', None)
-            ground_truth = spectra_instance.get('peptide', None)
-            case_label = spectra_instance.get('case_label', None)
-            scan_number = spectra_instance.get('scan_number', None)
-            raw_file = spectra_instance.get('raw_file', None)
+    print(f"{len(data)} spectra to process")
 
-            try:
-                prediction = predict_from_single_spectrum(
-                    i, model, tokenizer, input_text,
-                )
-            except ValueError as e:
-                print(f"Skipping spectrum {i}: {e}")
-                prediction = None
+    batch_size = cfg.inference_batch_size
+    for batch_start in range(0, len(data), batch_size):
+        batch = list(enumerate(data[batch_start:batch_start + batch_size], batch_start + 1))
+        batch_ids = [i for i, _ in batch]
+        print(f"Processing spectra {batch_ids[0]}-{batch_ids[-1]} (batch of {len(batch)}) ...")
 
+        input_texts = [inst.get('input', None) for _, inst in batch]
+
+        try:
+            predictions = predict_from_spectrum_batch(model, tokenizer, cfg, input_texts)
+        except Exception as e:
+            # A failure here affects the WHOLE batch, not just one spectrum —
+            # the trade-off for batched generation's speed.
+            print(f"Batch {batch_ids[0]}-{batch_ids[-1]} failed: {type(e).__name__}: {e}")
+            predictions = [None] * len(batch)
+
+        for (i, spectra_instance), prediction in zip(batch, predictions):
             results.append({
                 "spectra_id": i,
-                "input":input_text,
-                "prediction":prediction,
-                "ground_truth": ground_truth,
-                "case_label": case_label,
-                "scan_number": scan_number,
-                "raw_file": raw_file,
+                "input": spectra_instance.get('input', None),
+                "prediction": prediction,
+                "ground_truth": spectra_instance.get('peptide', None),
+                "case_label": spectra_instance.get('case_label', None),
+                "scan_number": spectra_instance.get('scan_number', None),
+                "raw_file": spectra_instance.get('raw_file', None),
             })
 
-            if output_path:
-                with open(output_path,'w') as out_f:
-                    json.dump(results, out_f, indent=2)
-            
-    evaluate(results)
+        if output_path:
+            with open(output_path, 'w') as out_f:
+                json.dump(results, out_f, indent=2)
+
+    metrics = evaluate(results)
+
+    if output_path:
+        manifest_path = output_path.rsplit(".json", 1)[0] + "_manifest.json"
+        manifest = {
+            "checkpoint": cfg.output_dir,
+            "max_new_tokens": cfg.max_new_tokens,
+            "temperature": cfg.temperature,
+            "max_seq_length": cfg.max_seq_length,
+            "inference_batch_size": cfg.inference_batch_size,
+            "input_batch_path": input_batch_path,
+            "num_examples_requested": num_examples,
+            "timestamp": datetime.now().isoformat(),
+            "metrics": metrics,
+        }
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=2)
+        print(f"Saved run manifest to {manifest_path}")
+
+
+def build_argparser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Reasoning-corpus model inference")
+    parser.add_argument("--checkpoint", type=str, required=True,
+                         help="Path to a merged_16bit checkpoint directory. No default — "
+                              "always specify explicitly to avoid accidentally evaluating "
+                              "against a stale model.")
+    parser.add_argument("--text", type=str, default=SAMPLE_INPUT)
+    parser.add_argument("--batch", type=str, default=None)
+    parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--num_examples", type=int, default=None)
+    parser.add_argument("--batch_size", type=int, default=None,
+                         help="Spectra generated per forward pass. Defaults to "
+                              "Config.inference_batch_size. Larger batches are "
+                              "faster but a single failure inside a batch loses "
+                              "predictions for the whole batch — start small "
+                              "and only raise it once you've confirmed memory "
+                              "headroom on your actual data.")
+    return parser
+
 
 def main():
-
-    parser = argparse.ArgumentParser(
-        description="SpectraChatModel Inference",
-    )
-
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default=MODEL_PATH,
-    )
-
-    parser.add_argument(
-        "--text",
-        type=str,
-        default=SAMPLE_INPUT,
-    )
-
-    parser.add_argument(
-        "--batch",
-        type=str,
-        default=None,
-    )
-    
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-    )
-
+    cfg = Config()
+    parser = build_argparser()
     args = parser.parse_args()
 
-    print("Loading model ... ")
+    cfg.output_dir = args.checkpoint  # repurposed here as "which checkpoint we're evaluating"
+    if args.batch_size is not None:
+        cfg.inference_batch_size = args.batch_size
+
+    print("Loading model ...")
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = args.checkpoint,
-        max_seq_length = MAX_SEQ_LENGTH,
-        dtype = None,
-        load_in_4bit = True
+        model_name=args.checkpoint,
+        max_seq_length=cfg.max_seq_length,
+        dtype=None,
+        load_in_4bit=True,
     )
 
     FastLanguageModel.for_inference(model)
-    tokenizer = get_chat_template(tokenizer, chat_template = "qwen-2.5")
+    tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
     print("Model loaded.\n")
 
     if args.batch:
-        num_examples = None
-        is_resume = True
-
-        predict_from_batch(model, tokenizer, args.batch, args.output, num_examples, is_resume)
-    
+        predict_from_batch(
+            model, tokenizer, cfg,
+            args.batch, args.output,
+            args.num_examples,
+        )
     elif args.text:
-
         try:
-            prediction = predict_from_single_spectrum(
-                "the given", model, tokenizer, args.text
-            )
-        except ValueError as e:
-            print(f"Skipping spectrum the given: {e}")
+            prediction = predict_from_single_spectrum(model, tokenizer, cfg, args.text)
+        except Exception as e:
+            print(f"Failed on single spectrum: {type(e).__name__}: {e}")
             prediction = None
 
-        print(f"OUTPUT:\n{prediction}")  
-    
+        print(f"OUTPUT:\n{prediction}")
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
     main()
