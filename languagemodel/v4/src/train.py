@@ -92,7 +92,7 @@ def main():
             lora_alpha = cfg.lora_alpha,
             lora_dropout = cfg.lora_dropout,
             bias = "none",
-            use_gradient_checkpointing = "unsloth",
+            use_gradient_checkpointing = False,
             random_state = cfg.seed,
             use_rslora = cfg.use_rslora,
         )
@@ -124,7 +124,10 @@ def main():
         report_to= "none",
         seed = cfg.seed,
         dataset_text_field = "text",
-        max_length = cfg.max_seq_length
+        max_length = cfg.max_seq_length,
+
+        gradient_checkpointing = True,
+         gradient_checkpointing_kwargs = {"use_reentrant": False},
     )
 
     trainer = SFTTrainer(
