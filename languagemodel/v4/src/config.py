@@ -45,9 +45,15 @@ class Config:
     logging_steps: int = 10
     seed: int = 42
 
-    # --- Evaluation / checkpointing (currently disabled in the original script — re-enabling next) ---
-    eval_strategy: str = "epoch"
-    save_strategy: str = "epoch"
+    # --- Evaluation / checkpointing
+    eval_strategy: str = "steps"
+    save_strategy: str = "steps"
+    eval_steps: int = 400
+    save_steps: int = 400
+    eval_accumulation_steps: int = 4
+    max_grad_norm: float = 1.0
+    report_to: str = "wandb"
+    wandb_project: str = "proteomics-reasoning-corpus"
     save_total_limit: int = 2
     load_best_model_at_end: bool = False
 
