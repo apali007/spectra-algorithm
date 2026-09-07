@@ -5,7 +5,7 @@
 #SBATCH --partition=compute
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=8
-#SBATCH --time=01:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=100G
 
 source /lclhome/apali007/miniconda3/etc/profile.d/conda.sh
