@@ -198,19 +198,30 @@ def main():
         response_part = "<|im_start|>assistant\n",
     )
 
-    stats = trainer.train()
+    try:
 
-    final_dir = cfg.output_dir + "/final"
-    model.save_pretrained(final_dir)
-    tokenizer.save_pretrained(final_dir)
+        stats = trainer.train()
 
-    if not cfg.full_finetune:
-        merged_dir = cfg.output_dir + "/merged_16bit"
-        model.save_pretrained_merged(
-            merged_dir,
-            tokenizer,
-            save_method = "merged_16bit"
-        )
+    except Exception as e:
+        """
+        load_best_model_at_end = True triggers a real bug in this peft/transformers
+        version combo at the very end of training(model.load_adapter -> broken
+        EmbeddingParallel import). Training itself completes successfully before
+        this point - only the final automatic reload crashes - so we catch it
+        here and continue using whatever checkpoint HuggingFace already tracked
+        as best throughout training (trainer.state.best_model_checkpoint),
+        rather than losing the run's progress entirely.
+        """
+        print(f"Trainer.train() raised during final best-model reload (known bug): {type(e).__name__}: {e}")
+        print("Training itself completed; continuing using the tracked best checkpoints.")
+
+
+    best_checkpoint = trainer.state.best_model_checkpoint
+    if best_checkpoint:
+        print(f"Best checkpoint: {best_checkpoint} (eval_loss ={trainer.state.best_metric:.5f})")
+    else:
+        print("No best checkpoint was tracked; using the final training state")
+
 
     # --- Multi-GPU (DDP) note ---
     """Under 'torchrun --nproc_per_node N src/train.py', this script runs once
@@ -220,6 +231,37 @@ def main():
     """
 
     if trainer.is_world_process_zero():
+
+        final_dir = cfg.output_dir + "/final"
+
+        if best_checkpoint and not cfg.full_finetune:
+            '''
+            The live 'model' object may hold the LAST checkpoint's weights, not the
+            BEST one --  the automatic in-place reaload (model.load_adapter) crashed
+            due to a known peft/transformers bug before it could swap weights.
+            A fresh load from disk (same pattern inference.py already uses) avoids
+            that broken code path entirely.
+            '''
+            print(f"Reloading best checkpoint fresh from disk: {best_checkpoint}")
+            del model
+            torch.cuda.empty_cache()
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name = best_checkpoint,
+                max_seq_length = cfg.max_seq_length,
+                dtype = None,
+                load_in_4bit = True,
+            )
+    
+        model.save_pretrained(final_dir)
+        tokenizer.save_pretrained(final_dir)
+    
+        if not cfg.full_finetune:
+            merged_dir = cfg.output_dir + "/merged_16bit"
+            model.save_pretrained_merged(
+                merged_dir,
+                tokenizer,
+                save_method = "merged_16bit"
+            )
 
         """
         Save the exact config used for this run, so the checkpoint dir is

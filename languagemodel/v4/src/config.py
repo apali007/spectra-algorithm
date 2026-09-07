@@ -48,14 +48,14 @@ class Config:
     # --- Evaluation / checkpointing
     eval_strategy: str = "steps"
     save_strategy: str = "steps"
-    eval_steps: int = 400
-    save_steps: int = 400
+    eval_steps: float = 0.1
+    save_steps: float = 0.1
     eval_accumulation_steps: int = 4
     max_grad_norm: float = 1.0
     report_to: str = "wandb"
     wandb_project: str = "proteomics-reasoning-corpus"
-    save_total_limit: int = 2
-    load_best_model_at_end: bool = False
+    save_total_limit: int = 3
+    load_best_model_at_end: bool = True
 
     # --- Multi-GPU (see next step) ---
     # Effective batch size = per_device_batch_size * grad_accum_steps * num_gpus.
