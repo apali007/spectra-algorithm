@@ -1,13 +1,23 @@
 import argparse
 import json
+import os
 import re
 from datetime import datetime
+import logging
 
+from transformers import set_seed
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def extract_predicted_peptide(prediction):
@@ -20,11 +30,10 @@ def extract_predicted_peptide(prediction):
 def normalize(peptide):
     return peptide.replace('I', 'L') if peptide else peptide
 
-
 def evaluate(results):
     """Reports two numbers, since they answer different questions:
     - attempted accuracy: correctness among spectra the model produced a
-      final sequence for (what the old script computed)
+      final sequence for
     - overall accuracy: correctness over ALL spectra, treating "no final
       sequence" as an incorrect/unresolved prediction, not a skip.
     Overall accuracy is the fair number for comparing against Casanovo and
@@ -34,32 +43,50 @@ def evaluate(results):
     total = len(results)
     attempted = 0
     match_count = 0
+    count_pred_none = 0
+    pred_pep_no_extraction = 0
 
     for item in results:
         ground_truth = item.get('ground_truth')
         prediction = item.get('prediction')
 
+        if prediction is None:
+            count_pred_none += 1
+
         predicted_peptide = extract_predicted_peptide(prediction) if prediction else None
 
         if predicted_peptide is None:
+            pred_pep_no_extraction += 1
             continue
 
         attempted += 1
         if ground_truth and normalize(predicted_peptide) == normalize(ground_truth):
             match_count += 1
 
-    print(f"\nTotal spectra: {total}")
-    print(f"Attempted (model produced a final sequence): {attempted} ({100*attempted/total:.1f}% coverage)" if total else "Attempted: 0")
+    logger.info(f"\nTotal spectra: {total}")
+    logger.info(f"Attempted (model produced a final sequence): {attempted} ({100*attempted/total:.1f}% coverage)" if total else "Attempted: 0")
 
     if attempted > 0:
-        print(f"Attempted accuracy: {100*match_count/attempted:.1f}%  ({match_count}/{attempted})")
+        logger.info(f"Attempted accuracy: {100*match_count/attempted:.1f}%  ({match_count}/{attempted})")
     else:
-        print("Attempted accuracy: n/a (no predictions attempted)")
+        logger.info("Attempted accuracy: n/a (no predictions attempted)")
 
     if total > 0:
-        print(f"Overall accuracy:   {100*match_count/total:.1f}%  ({match_count}/{total})")
+        logger.info(f"Overall accuracy:   {100*match_count/total:.1f}%  ({match_count}/{total})")
     else:
-        print("Overall accuracy: n/a (empty result set)")
+        logger.info("Overall accuracy: n/a (empty result set)")
+
+    if pred_pep_no_extraction > 0:
+        logger.info(f"Prediction cannot be extracted: {100*pred_pep_no_extraction/total:.1f}%  ({pred_pep_no_extraction}/{total})")
+    else:
+        logger.info("Prediction cannot be extracted: n/a (all predictions can be extracted)")
+
+    if count_pred_none > 0:
+        logger.info(f"Prediction none or empty: {100*count_pred_none/total:.1f}%  ({count_pred_none}/{total})")
+    else:
+        logger.info("Prediction none or empty: n/a (no none or empty prediction)")
+
+
 
     return {
         "total": total,
@@ -153,48 +180,81 @@ def predict_from_spectrum_batch(model, tokenizer, cfg: Config, spectrum_inputs):
 
 
 def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_path, num_examples):
-    results = []
-
     with open(input_batch_path, 'r') as f:
         data = json.load(f)
 
     if num_examples is not None:
         data = data[:num_examples]
 
-    print(f"{len(data)} spectra to process")
+    ids_in_scope = set(range(1, len(data) + 1))
 
-    batch_size = cfg.inference_batch_size
-    for batch_start in range(0, len(data), batch_size):
-        batch = list(enumerate(data[batch_start:batch_start + batch_size], batch_start + 1))
-        batch_ids = [i for i, _ in batch]
-        print(f"Processing spectra {batch_ids[0]}-{batch_ids[-1]} (batch of {len(batch)}) ...")
+    results = []
+    processed_ids = set()
 
-        input_texts = [inst.get('input', None) for _, inst in batch]
+    if output_path and os.path.exists(output_path):
+        with open(output_path, 'r') as f:
+            loaded_results = json.load(f)
 
-        try:
-            predictions = predict_from_spectrum_batch(model, tokenizer, cfg, input_texts)
-        except Exception as e:
-            # A failure here affects the WHOLE batch, not just one spectrum —
-            # the trade-off for batched generation's speed.
-            print(f"Batch {batch_ids[0]}-{batch_ids[-1]} failed: {type(e).__name__}: {e}")
-            predictions = [None] * len(batch)
+        results = [item for item in loaded_results if item["spectra_id"] in ids_in_scope]
 
-        for (i, spectra_instance), prediction in zip(batch, predictions):
-            results.append({
-                "spectra_id": i,
-                "input": spectra_instance.get('input', None),
-                "prediction": prediction,
-                "ground_truth": spectra_instance.get('peptide', None),
-                "case_label": spectra_instance.get('case_label', None),
-                "scan_number": spectra_instance.get('scan_number', None),
-                "raw_file": spectra_instance.get('raw_file', None),
-            })
+        processed_ids = {item["spectra_id"] for item in results if item.get("prediction") is not None}
+        failed_count = len(results) - len(processed_ids)
+        results = [item for item in results if item["spectra_id"] in processed_ids]
+        if failed_count:
+            logger.info(f"{failed_count} previously-failed spectra will be retried this run.")
+        logger.info(f"Found {len(processed_ids)} already-processed spectra in {output_path}, resuming and skipping those.")
+    
+    remaining_ids = ids_in_scope - processed_ids
+    logger.info(f"{len(data)} spectra total ({len(remaining_ids)} remaining to process)")
 
-        if output_path:
-            with open(output_path, 'w') as out_f:
-                json.dump(results, out_f, indent=2)
+    if not remaining_ids:
+        logger.info("All spectra already have predictions - skipping generation, running evaluation only.")
+    else:
+        batch_size = cfg.inference_batch_size
+        for batch_start in range(0, len(data), batch_size):
+            batch_full = list(enumerate(data[batch_start:batch_start + batch_size], batch_start + 1))
+            batch = [(i, inst) for i, inst in batch_full if i not in processed_ids]
 
-    metrics = evaluate(results)
+            if not batch:
+                full_ids = [i for i, _ in batch_full]
+                logger.info(f"Spectra {full_ids[0]}-{full_ids[-1]} already done in prior run, skipping batch.")
+                continue
+
+            batch_ids = [i for i, _ in batch]
+            if batch_ids == list(range(batch_ids[0], batch_ids[-1] + 1)):
+                logger.info(f"Processing spectra {batch_ids[0]}-{batch_ids[-1]} (batch of {len(batch)}) ...")
+            else:
+                logger.info(f"Processing spectra {batch_ids} (batch of {len(batch)}), gaps from prior resume...")
+
+            input_texts = [inst.get('input', None) for _, inst in batch]
+
+            try:
+                predictions = predict_from_spectrum_batch(model, tokenizer, cfg, input_texts)
+            except Exception as e:
+                # A failure here affects the WHOLE batch, not just one spectrum —
+                # the trade-off for batched generation's speed.
+                if batch_ids == list(range(batch_ids[0], batch_ids[-1] + 1)):
+                    logger.error(f"Batch {batch_ids[0]}-{batch_ids[-1]} failed: {type(e).__name__}: {e}")
+                else:
+                    logger.error(f"Batch {batch_ids} failed: {type(e).__name__}: {e}")
+                predictions = [None] * len(batch)
+
+            for (i, spectra_instance), prediction in zip(batch, predictions):
+                results.append({
+                    "spectra_id": i,
+                    "input": spectra_instance.get('input', None),
+                    "prediction": prediction,
+                    "ground_truth": spectra_instance.get('peptide', None),
+                    "case_label": spectra_instance.get('case_label', None),
+                    "scan_number": spectra_instance.get('scan_number', None),
+                    "raw_file": spectra_instance.get('raw_file', None),
+                })
+
+            if output_path:
+                with open(output_path, 'w') as out_f:
+                    json.dump(results, out_f, indent=2)
+
+    metrics = evaluate(results) if results else None
 
     if output_path:
         manifest_path = output_path.rsplit(".json", 1)[0] + "_manifest.json"
@@ -211,7 +271,7 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
         }
         with open(manifest_path, 'w') as f:
             json.dump(manifest, f, indent=2)
-        print(f"Saved run manifest to {manifest_path}")
+        logger.info(f"Saved run manifest to {manifest_path}")
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -231,6 +291,9 @@ def build_argparser() -> argparse.ArgumentParser:
                               "predictions for the whole batch — start small "
                               "and only raise it once you've confirmed memory "
                               "headroom on your actual data.")
+    parser.add_argument("--seed", type=int, default=None, 
+                        help="Random seed for generation, so sampled outputs are "
+                        "reproducible run-to-run. Defaults to Config.seed.")
     return parser
 
 
@@ -239,11 +302,24 @@ def main():
     parser = build_argparser()
     args = parser.parse_args()
 
+    if not os.path.exists(args.checkpoint):
+        raise FileNotFoundError(
+        f"Checkpoint path does not exist: {args.checkpoint}\n"
+        "Double-check the path - no fallback is used, to avoid silently "
+        "evaluating against the wrong model."
+        )
+
+    if args.batch and not os.path.exists(args.batch):
+        raise FileNotFoundError(f"--batch file does not exist: {args.batch}")
+
     cfg.output_dir = args.checkpoint  # repurposed here as "which checkpoint we're evaluating"
     if args.batch_size is not None:
         cfg.inference_batch_size = args.batch_size
 
-    print("Loading model ...")
+    seed = args.seed if args.seed is not None else cfg.seed
+    set_seed(seed)
+
+    logger.info("Loading model ...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=args.checkpoint,
         max_seq_length=cfg.max_seq_length,
@@ -253,7 +329,7 @@ def main():
 
     FastLanguageModel.for_inference(model)
     tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
-    print("Model loaded.\n")
+    logger.info("Model loaded.\n")
 
     if args.batch:
         predict_from_batch(
@@ -265,10 +341,10 @@ def main():
         try:
             prediction = predict_from_single_spectrum(model, tokenizer, cfg, args.text)
         except Exception as e:
-            print(f"Failed on single spectrum: {type(e).__name__}: {e}")
+            logger.error(f"Failed on single spectrum: {type(e).__name__}: {e}")
             prediction = None
 
-        print(f"OUTPUT:\n{prediction}")
+        logger.info(f"OUTPUT:\n{prediction}")
 
 
 if __name__ == "__main__":
