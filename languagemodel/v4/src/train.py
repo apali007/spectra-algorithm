@@ -9,41 +9,6 @@ import torch
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
 
-def preprocess_logits_for_metrics(logits, labels):
-    """
-    Runs once per eval batch, immediately reducing the huge
-    (batch, seq_len, vocab_size) logits down to just the model's
-    top guess per position (batch, seq_len). Without this, the trainer
-    would try to hold full-vocabulary logits for the whole eval set in memory
-    before computing accuracy - a real risk of runninf out of memory
-    given Qwen's large vocabulary
-    """
-    if isinstance(logits, tuple):
-        logits = logits[0]
-    return logits.argmax(dim=-1)
-
-def compute_metrics(eval_pred):
-    """
-    Cheap, token-evel accuracy: for each position in the assistant's
-    response, did the model's top guess token match the true token?
-    This is NOT the same as full peptide-sequence accuracy (that requires
-    actually generating text, which is inference.py's job, rum separately
-    on the heldout test set after training). This is a fast proxy signal
-    computed for free from the same forward pass eval_loss already uses.
-    """
-    predictions, labels = eval_pred
-    predictions = predictions[:, :-1]
-    labels = labels[:, 1:]
-
-    mask = labels != -100
-    correct = ((predictions == labels) & mask).sum()
-    total = mask.sum()
-    accuracy = correct / total if total > 0 else 0.0
-    return {"token_accuracy": float(accuracy)}
-
-
-
-
 def load_and_format(cfg: Config, tokenizer):
     """Loads train/val/test JSON into chat-formatted text the model expects."""
 
@@ -179,8 +144,6 @@ def main():
         train_dataset = train_ds,
         eval_dataset = eval_ds,
         processing_class = tokenizer,
-        compute_metrics = compute_metrics,
-        preprocess_logits_for_metrics = preprocess_logits_for_metrics
     )
 
     # --- Loss masking fix ---
