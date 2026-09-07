@@ -33,3 +33,6 @@ __pycache__/
 # Virtual environments
 .env
 .venv
+
+# wandb
+wandb/
