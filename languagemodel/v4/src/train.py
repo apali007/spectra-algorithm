@@ -5,9 +5,17 @@ from trl import SFTTrainer, SFTConfig
 from unsloth.chat_templates import get_chat_template, train_on_responses_only
 import os
 import torch
+import logging
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 def load_and_format(cfg: Config, tokenizer):
     """Loads train/val/test JSON into chat-formatted text the model expects."""
@@ -175,15 +183,15 @@ def main():
         as best throughout training (trainer.state.best_model_checkpoint),
         rather than losing the run's progress entirely.
         """
-        print(f"Trainer.train() raised during final best-model reload (known bug): {type(e).__name__}: {e}")
-        print("Training itself completed; continuing using the tracked best checkpoints.")
+        logger.error(f"Trainer.train() raised during final best-model reload (known bug): {type(e).__name__}: {e}")
+        logger.warning("Training itself completed; continuing using the tracked best checkpoints.")
 
 
     best_checkpoint = trainer.state.best_model_checkpoint
     if best_checkpoint:
-        print(f"Best checkpoint: {best_checkpoint} (eval_loss ={trainer.state.best_metric:.5f})")
+        logger.info(f"Best checkpoint: {best_checkpoint} (eval_loss ={trainer.state.best_metric:.5f})")
     else:
-        print("No best checkpoint was tracked; using the final training state")
+        logger.info("No best checkpoint was tracked; using the final training state")
 
 
     # --- Multi-GPU (DDP) note ---
@@ -205,14 +213,14 @@ def main():
             A fresh load from disk (same pattern inference.py already uses) avoids
             that broken code path entirely.
             '''
-            print(f"Reloading best checkpoint fresh from disk: {best_checkpoint}")
+            logger.info(f"Reloading best checkpoint fresh from disk: {best_checkpoint}")
             del model
             torch.cuda.empty_cache()
             model, tokenizer = FastLanguageModel.from_pretrained(
                 model_name = best_checkpoint,
                 max_seq_length = cfg.max_seq_length,
                 dtype = None,
-                load_in_4bit = True,
+                load_in_4bit = False,
             )
     
         model.save_pretrained(final_dir)
@@ -267,7 +275,7 @@ def main():
             pad_token_id = tokenizer.eos_token_id,
         )
 
-        print(tokenizer.decode(out[0][inputs.shape[1]:], skip_special_tokens=True))
+        logger.info(tokenizer.decode(out[0][inputs.shape[1]:], skip_special_tokens=True))
 
 
 if __name__ == "__main__":

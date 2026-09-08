@@ -4,6 +4,8 @@ import os
 import re
 from datetime import datetime
 import logging
+from collections import Counter
+import hashlib
 
 from transformers import set_seed
 from unsloth import FastLanguageModel
@@ -20,81 +22,79 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def extract_predicted_peptide(prediction):
-    match = re.search(r"Final predicted sequence: ([A-Z]+)\.", prediction)
-    if match:
-        return match.group(1)
-    return None
+# def extract_predicted_peptide(prediction):
+#     match = re.search(r"Final predicted sequence: ([A-Z]+)\.", prediction)
+#     if match:
+#         return match.group(1)
+#     return None
 
 
-def normalize(peptide):
-    return peptide.replace('I', 'L') if peptide else peptide
+# def normalize(peptide):
+#     return peptide.replace('I', 'L') if peptide else peptide
 
-def evaluate(results):
-    """Reports two numbers, since they answer different questions:
-    - attempted accuracy: correctness among spectra the model produced a
-      final sequence for
-    - overall accuracy: correctness over ALL spectra, treating "no final
-      sequence" as an incorrect/unresolved prediction, not a skip.
-    Overall accuracy is the fair number for comparing against Casanovo and
-    other baselines, since it doesn't let "declined to answer" cases quietly
-    inflate the score.
-    """
-    total = len(results)
-    attempted = 0
-    match_count = 0
-    count_pred_none = 0
-    pred_pep_no_extraction = 0
+# def evaluate(results):
+#     """Reports two numbers, since they answer different questions:
+#     - attempted accuracy: correctness among spectra the model produced a
+#       final sequence for
+#     - overall accuracy: correctness over ALL spectra, treating "no final
+#       sequence" as an incorrect/unresolved prediction, not a skip.
+#     Overall accuracy is the fair number for comparing against Casanovo and
+#     other baselines, since it doesn't let "declined to answer" cases quietly
+#     inflate the score.
+#     """
+#     total = len(results)
+#     attempted = 0
+#     match_count = 0
+#     count_pred_none = 0
+#     pred_pep_no_extraction = 0
 
-    for item in results:
-        ground_truth = item.get('ground_truth')
-        prediction = item.get('prediction')
+#     for item in results:
+#         ground_truth = item.get('ground_truth')
+#         prediction = item.get('prediction')
 
-        if prediction is None:
-            count_pred_none += 1
+#         if prediction is None:
+#             count_pred_none += 1
 
-        predicted_peptide = extract_predicted_peptide(prediction) if prediction else None
+#         predicted_peptide = extract_predicted_peptide(prediction) if prediction else None
 
-        if predicted_peptide is None:
-            pred_pep_no_extraction += 1
-            continue
+#         if predicted_peptide is None:
+#             pred_pep_no_extraction += 1
+#             continue
 
-        attempted += 1
-        if ground_truth and normalize(predicted_peptide) == normalize(ground_truth):
-            match_count += 1
+#         attempted += 1
+#         if ground_truth and normalize(predicted_peptide) == normalize(ground_truth):
+#             match_count += 1
 
-    logger.info(f"\nTotal spectra: {total}")
-    logger.info(f"Attempted (model produced a final sequence): {attempted} ({100*attempted/total:.1f}% coverage)" if total else "Attempted: 0")
+#     logger.info(f"\nTotal spectra: {total}")
+#     logger.info(f"Attempted (model produced a final sequence): {attempted} ({100*attempted/total:.1f}% coverage)" if total else "Attempted: 0")
 
-    if attempted > 0:
-        logger.info(f"Attempted accuracy: {100*match_count/attempted:.1f}%  ({match_count}/{attempted})")
-    else:
-        logger.info("Attempted accuracy: n/a (no predictions attempted)")
+#     if attempted > 0:
+#         logger.info(f"Attempted accuracy: {100*match_count/attempted:.1f}%  ({match_count}/{attempted})")
+#     else:
+#         logger.info("Attempted accuracy: n/a (no predictions attempted)")
 
-    if total > 0:
-        logger.info(f"Overall accuracy:   {100*match_count/total:.1f}%  ({match_count}/{total})")
-    else:
-        logger.info("Overall accuracy: n/a (empty result set)")
+#     if total > 0:
+#         logger.info(f"Overall accuracy:   {100*match_count/total:.1f}%  ({match_count}/{total})")
+#     else:
+#         logger.info("Overall accuracy: n/a (empty result set)")
 
-    if pred_pep_no_extraction > 0:
-        logger.info(f"Prediction cannot be extracted: {100*pred_pep_no_extraction/total:.1f}%  ({pred_pep_no_extraction}/{total})")
-    else:
-        logger.info("Prediction cannot be extracted: n/a (all predictions can be extracted)")
+#     if pred_pep_no_extraction > 0:
+#         logger.info(f"Prediction cannot be extracted: {100*pred_pep_no_extraction/total:.1f}%  ({pred_pep_no_extraction}/{total})")
+#     else:
+#         logger.info("Prediction cannot be extracted: n/a (all predictions can be extracted)")
 
-    if count_pred_none > 0:
-        logger.info(f"Prediction none or empty: {100*count_pred_none/total:.1f}%  ({count_pred_none}/{total})")
-    else:
-        logger.info("Prediction none or empty: n/a (no none or empty prediction)")
+#     if count_pred_none > 0:
+#         logger.info(f"Prediction none or empty: {100*count_pred_none/total:.1f}%  ({count_pred_none}/{total})")
+#     else:
+#         logger.info("Prediction none or empty: n/a (no none or empty prediction)")
 
-
-
-    return {
-        "total": total,
-        "attempted": attempted,
-        "correct": match_count,
-        "attempted_accuracy_pct": (100 * match_count / attempted) if attempted else None,
-        "overall_accuracy_pct": (100 * match_count / total) if total else None,
-    }
+#     return {
+#         "total": total,
+#         "attempted": attempted,
+#         "correct": match_count,
+#         "attempted_accuracy_pct": (100 * match_count / attempted) if attempted else None,
+#         "overall_accuracy_pct": (100 * match_count / total) if total else None,
+#     }
 
 
 def predict_from_single_spectrum(model, tokenizer, cfg: Config, spectrum_input):
@@ -178,15 +178,39 @@ def predict_from_spectrum_batch(model, tokenizer, cfg: Config, spectrum_inputs):
     ]
     return predictions
 
+def spectra_key(item):
+    raw_file = item.get('raw_file')
+    scan_number = item.get('scan_number')
+    peptide = item.get('peptide')
+    return f"{raw_file}::{scan_number}::{peptide}"
 
-def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_path, num_examples):
+def shard_of(key: str, num_shards: int) -> int:
+    """
+    Deterministic bucket assignment via md5 - 
+    Dont use Python's built-in hash() as it can randomize per-process for strings, which would silently reassign
+    every spectrum to a different shard on every run.
+    """
+    digest = hashlib.md5(key.encode("utf-8")).hexdigest()
+    return int(digest, 16) % num_shards
+
+def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_path, num_examples, shard_index, num_shards, seed):
     with open(input_batch_path, 'r') as f:
         data = json.load(f)
 
     if num_examples is not None:
         data = data[:num_examples]
 
-    ids_in_scope = set(range(1, len(data) + 1))
+    keyed_data = [(spectra_key(item), item) for item in data]
+
+    key_counts = Counter(key for key, _ in keyed_data)
+    dupes = {key for key, count in key_counts.items() if count > 1}
+    if dupes:
+        logger.warning(f"{len(dupes)} duplicate spectra_key(s) found - these spectra " \
+                       f"may be silently skipped due to key collisions: {list(dupes)[:5]}" \
+                       f"{'...' if len(dupes) > 5 else ''}")
+
+    ids_in_scope = {key for key, _ in keyed_data if shard_of(key, num_shards) == shard_index}
+    shard_data = [(key, item) for key, item in keyed_data if key in ids_in_scope]
 
     results = []
     processed_ids = set()
@@ -195,53 +219,38 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
         with open(output_path, 'r') as f:
             loaded_results = json.load(f)
 
-        results = [item for item in loaded_results if item["spectra_id"] in ids_in_scope]
+        results = [item for item in loaded_results if spectra_key(item) in ids_in_scope]
 
-        processed_ids = {item["spectra_id"] for item in results if item.get("prediction") is not None}
+        processed_ids = {spectra_key(item) for item in results if item.get("prediction") not in (None,"")}
         failed_count = len(results) - len(processed_ids)
-        results = [item for item in results if item["spectra_id"] in processed_ids]
+        results = [item for item in results if spectra_key(item) in processed_ids]
         if failed_count:
             logger.info(f"{failed_count} previously-failed spectra will be retried this run.")
         logger.info(f"Found {len(processed_ids)} already-processed spectra in {output_path}, resuming and skipping those.")
     
-    remaining_ids = ids_in_scope - processed_ids
-    logger.info(f"{len(data)} spectra total ({len(remaining_ids)} remaining to process)")
+    remaining_data = [(key, item) for key, item in shard_data if key not in processed_ids]
+    logger.info(f"Shard {shard_index}/{num_shards}: {len(shard_data)} spectra assigned, {len(remaining_data)} remaining to process")
 
-    if not remaining_ids:
+    if not remaining_data:
         logger.info("All spectra already have predictions - skipping generation, running evaluation only.")
     else:
         batch_size = cfg.inference_batch_size
-        for batch_start in range(0, len(data), batch_size):
-            batch_full = list(enumerate(data[batch_start:batch_start + batch_size], batch_start + 1))
-            batch = [(i, inst) for i, inst in batch_full if i not in processed_ids]
+        for batch_start in range(0, len(remaining_data), batch_size):
+            batch = remaining_data[batch_start:batch_start + batch_size]
 
-            if not batch:
-                full_ids = [i for i, _ in batch_full]
-                logger.info(f"Spectra {full_ids[0]}-{full_ids[-1]} already done in prior run, skipping batch.")
-                continue
-
-            batch_ids = [i for i, _ in batch]
-            if batch_ids == list(range(batch_ids[0], batch_ids[-1] + 1)):
-                logger.info(f"Processing spectra {batch_ids[0]}-{batch_ids[-1]} (batch of {len(batch)}) ...")
-            else:
-                logger.info(f"Processing spectra {batch_ids} (batch of {len(batch)}), gaps from prior resume...")
+            batch_keys = [key for key, _ in batch]
+            logger.info(f"Processing spectra {batch_keys} (batch of {len(batch)}) ...")
 
             input_texts = [inst.get('input', None) for _, inst in batch]
 
             try:
                 predictions = predict_from_spectrum_batch(model, tokenizer, cfg, input_texts)
             except Exception as e:
-                # A failure here affects the WHOLE batch, not just one spectrum —
-                # the trade-off for batched generation's speed.
-                if batch_ids == list(range(batch_ids[0], batch_ids[-1] + 1)):
-                    logger.error(f"Batch {batch_ids[0]}-{batch_ids[-1]} failed: {type(e).__name__}: {e}")
-                else:
-                    logger.error(f"Batch {batch_ids} failed: {type(e).__name__}: {e}")
+                logger.error(f"Batch {batch_keys} failed: {type(e).__name__}: {e}")
                 predictions = [None] * len(batch)
 
-            for (i, spectra_instance), prediction in zip(batch, predictions):
+            for (key, spectra_instance), prediction in zip(batch, predictions):
                 results.append({
-                    "spectra_id": i,
                     "input": spectra_instance.get('input', None),
                     "prediction": prediction,
                     "ground_truth": spectra_instance.get('peptide', None),
@@ -254,7 +263,15 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
                 with open(output_path, 'w') as out_f:
                     json.dump(results, out_f, indent=2)
 
-    metrics = evaluate(results) if results else None
+
+    '''
+    Evaluation is intentionally NOT run here when sharding is in use - 
+    this function only sees ONE shard's worth of data, so any accuracy
+    numbers printed here would silently misrepresent the full test set.
+    Run evaluate() seperarely over the merged shard output instead.
+    '''
+    # metrics = evaluate(results) if results else None
+    metrics = None
 
     if output_path:
         manifest_path = output_path.rsplit(".json", 1)[0] + "_manifest.json"
@@ -266,6 +283,9 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
             "inference_batch_size": cfg.inference_batch_size,
             "input_batch_path": input_batch_path,
             "num_examples_requested": num_examples,
+            "shard_index": shard_index,
+            "num_shards": num_shards,
+            "seed": seed,
             "timestamp": datetime.now().isoformat(),
             "metrics": metrics,
         }
@@ -294,6 +314,14 @@ def build_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=None, 
                         help="Random seed for generation, so sampled outputs are "
                         "reproducible run-to-run. Defaults to Config.seed.")
+    parser.add_argument("--shard_index", type=int, default=0, 
+                        help="Which shard this process handles (0-indexed). Used with " \
+                        "--num_shards to split one test set across multiple GPU " \
+                        "processes without pre-spliting the file.")
+    parser.add_argument("--num_shards", type=int, default=1, 
+                    help="Total number of shards. Each spectrum goes to exactly " \
+                    "one shard, so running all shards together covers the " \
+                    "full test set with no overlap.")
     return parser
 
 
@@ -324,7 +352,7 @@ def main():
         model_name=args.checkpoint,
         max_seq_length=cfg.max_seq_length,
         dtype=None,
-        load_in_4bit=True,
+        load_in_4bit=False,
     )
 
     FastLanguageModel.for_inference(model)
@@ -332,10 +360,16 @@ def main():
     logger.info("Model loaded.\n")
 
     if args.batch:
+        if not (0 <= args.shard_index < args.num_shards):
+            raise ValueError(f"--shard_index ({args.shard_index}) must be in [0, {args.num_shards})")
+
         predict_from_batch(
             model, tokenizer, cfg,
             args.batch, args.output,
             args.num_examples,
+            args.shard_index,
+            args.num_shards,
+            seed,
         )
     elif args.text:
         try:
