@@ -278,6 +278,7 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
         manifest_path = output_path.rsplit(".json", 1)[0] + "_manifest.json"
         manifest = {
             "checkpoint": cfg.output_dir,
+            "output_path": output_path,
             "max_new_tokens": cfg.max_new_tokens,
             "temperature": cfg.temperature,
             "max_seq_length": cfg.max_seq_length,
@@ -302,9 +303,11 @@ def build_argparser() -> argparse.ArgumentParser:
                          help="Path to a merged_16bit checkpoint directory. No default — "
                               "always specify explicitly to avoid accidentally evaluating "
                               "against a stale model.")
-    parser.add_argument("--text", type=str, default=SAMPLE_INPUT)
-    parser.add_argument("--batch", type=str, default=None)
     parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--batch", type=str, default=None)
+
+    # below arguments are not defined in jobs/run_inference.sh
+    parser.add_argument("--text", type=str, default=SAMPLE_INPUT)
     parser.add_argument("--num_examples", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None,
                          help="Spectra generated per forward pass. Defaults to "
@@ -324,6 +327,7 @@ def build_argparser() -> argparse.ArgumentParser:
                     help="Total number of shards. Each spectrum goes to exactly " \
                     "one shard, so running all shards together covers the " \
                     "full test set with no overlap.")
+    
     return parser
 
 
