@@ -222,6 +222,9 @@ def main():
                 dtype = None,
                 load_in_4bit = False,
             )
+
+            tokenizer.pad_token = tokenizer.eos_token
+            model.config.pad_token_id = tokenizer.eos_token_id
     
         model.save_pretrained(final_dir)
         tokenizer.save_pretrained(final_dir)
