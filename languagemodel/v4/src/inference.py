@@ -287,6 +287,7 @@ def predict_from_batch(model, tokenizer, cfg: Config, input_batch_path, output_p
             "shard_index": shard_index,
             "num_shards": num_shards,
             "seed": seed,
+            "load_in_4bit": cfg.load_in_4bit,
             "timestamp": datetime.now().isoformat(),
             "metrics": metrics,
         }
@@ -353,7 +354,7 @@ def main():
         model_name=args.checkpoint,
         max_seq_length=cfg.max_seq_length,
         dtype=None,
-        load_in_4bit=False,
+        load_in_4bit=cfg.load_in_4bit,
     )
 
     FastLanguageModel.for_inference(model)

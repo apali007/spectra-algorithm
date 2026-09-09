@@ -6,6 +6,7 @@ from unsloth.chat_templates import get_chat_template, train_on_responses_only
 import os
 import torch
 import logging
+from transformers import EarlyStoppingCallback
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
@@ -155,6 +156,7 @@ def main():
         eval_dataset = eval_ds,
         processing_class = tokenizer,
     )
+    trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=cfg.early_stopping_patience))
 
     # --- Loss masking fix ---
     """Without this (and therefore every gradient update) is computed over
@@ -186,11 +188,29 @@ def main():
         rather than losing the run's progress entirely.
         """
         logger.error(f"Trainer.train() raised during final best-model reload (known bug): {type(e).__name__}: {e}")
-        logger.warning("Training itself completed; continuing using the tracked best checkpoints.")
+        logger.warning("Continuing using the tracked best checkpoints.")
 
+    '''
+    Fraction-based eval_steps (e.g. 0.1) can round such that the very last
+    step never gets evaluated. so best_model_checkpoint might be missing a
+    fair comparision against the fully-trained model. Run one explicit final
+    eval here so that comparision is always available, regardless of rounding
+    '''
+    final_metrics = trainer.evaluate()
+    final_eval_loss = final_metrics.get('eval_loss')
+    logger.info(f"Final eval (end of training): eval_loss={final_eval_loss}")
 
     best_checkpoint = trainer.state.best_model_checkpoint
-    if best_checkpoint:
+
+    if trainer.state.best_metric is None or (final_eval_loss is not None and final_eval_loss < trainer.state.best_metric):
+        eval_loss_str = f"{final_eval_loss:.5f}" if final_eval_loss is not None else "N/A"
+        logger.info(f"Final training state (eval_loss={eval_loss_str}) beats or matches the "
+                    f"tracked best ({trainer.state.best_metric}); saving it explicitly.")
+        final_step_dir = f"{cfg.output_dir}/checkpoint-final-step"
+        if trainer.is_world_process_zero():
+            trainer.save_model(final_step_dir)
+        best_checkpoint = final_step_dir
+    elif best_checkpoint:
         logger.info(f"Best checkpoint: {best_checkpoint} (eval_loss ={trainer.state.best_metric:.5f})")
     else:
         logger.info("No best checkpoint was tracked; using the final training state")
@@ -222,7 +242,7 @@ def main():
                 model_name = best_checkpoint,
                 max_seq_length = cfg.max_seq_length,
                 dtype = None,
-                load_in_4bit = False,
+                load_in_4bit = cfg.load_in_4bit,
             )
 
             tokenizer.pad_token = tokenizer.eos_token

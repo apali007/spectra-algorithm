@@ -44,6 +44,14 @@ class Config:
     optim: str = "adamw_8bit"
     logging_steps: int = 10
     seed: int = 42
+    early_stopping_patience: int = 2
+
+     # NOTE: does NOT control the main QLoRA training load above (that always
+    # uses 4-bit for the frozen base model via `not cfg.full_finetune`,
+    # regardless of this flag). This field only controls: (1) train.py's
+    # post-training reload before merging into merged_16bit, and
+    # (2) inference.py's checkpoint load for evaluation. 
+    load_in_4bit: bool = False
 
     # --- Evaluation / checkpointing
     eval_strategy: str = "steps"
