@@ -188,17 +188,8 @@ def main():
         stats = trainer.train()
 
     except Exception as e:
-        """
-        load_best_model_at_end = True triggers a real bug in this peft/transformers
-        version combo at the very end of training(model.load_adapter -> broken
-        EmbeddingParallel import). Training itself completes successfully before
-        this point - only the final automatic reload crashes - so we catch it
-        here and continue using whatever checkpoint HuggingFace already tracked
-        as best throughout training (trainer.state.best_model_checkpoint),
-        rather than losing the run's progress entirely.
-        """
-        logger.error(f"Trainer.train() raised during final best-model reload (known bug): {type(e).__name__}: {e}")
-        logger.warning("Continuing using the tracked best checkpoints.")
+        logger.error(f"Trainer.train() raised: {type(e).__name__}: {e}")
+        logger.warning(f"Continuing using the tracked best checkpoints. Steps completed: {trainer.state.global_step}/{trainer.state.max_steps}.")
 
     '''
     Fraction-based eval_steps (e.g. 0.1) can round such that the very last

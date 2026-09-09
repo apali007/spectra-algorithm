@@ -41,7 +41,7 @@ class Config:
     lr_scheduler_type: str = "cosine"
     warmup_ratio: float = 0.05
     weight_decay: float = 0.01
-    optim: str = "adamw_8bit"
+    optim: str = "paged_adamw_8bit"
     logging_steps: int = 10
     seed: int = 42
     early_stopping_patience: int = 2
