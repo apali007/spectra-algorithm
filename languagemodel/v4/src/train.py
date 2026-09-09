@@ -85,6 +85,7 @@ def main():
     cfg.train_set_dir = args.train_set_dir
     cfg.val_set_dir = args.val_set_dir
     cfg.push_to_hub = args.push_to_hub
+    cfg.early_stopping_enabled = args.early_stopping
 
     if int(os.environ.get("RANK", 0)) == 0:
         cfg.save(f"{cfg.output_dir}/run_config.json")
@@ -164,7 +165,7 @@ def main():
         processing_class = tokenizer,
     )
 
-    if args.early_stopping:
+    if cfg.early_stopping_enabled:
         trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=cfg.early_stopping_patience))
 
     # --- Loss masking fix ---
