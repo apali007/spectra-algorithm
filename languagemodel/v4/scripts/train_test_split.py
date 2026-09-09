@@ -12,10 +12,6 @@
 #   indirectly tuned against this set
 # - test: held out completely, touched only once, at the end, for the
 #   final reported numbers — never used for checkpoint selection
-#
-# Usage:
-#   python scripts/train_test_split.py --input path/to/dataset.json --prefix my_run
-#   (writes my_run_train.json, my_run_val.json, my_run_test.json into --output_dir)
 
 import argparse
 import json
@@ -26,7 +22,6 @@ from collections import Counter
 
 DEFAULT_INPUT = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/output/30k_mass_analyzer_aware_prospect_reasoning_dataset.json'
 DEFAULT_OUTPUT_DIR = '/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/processed'
-DEFAULT_PREFIX = 'default_name'
 
 
 def main():
@@ -35,8 +30,6 @@ def main():
                          help="Path to the generated reasoning-corpus JSON to split.")
     parser.add_argument("--output_dir", default=DEFAULT_OUTPUT_DIR,
                          help="Directory to write train/val/test JSON files into.")
-    parser.add_argument("--prefix", default=DEFAULT_PREFIX,
-                         help="Filename prefix, e.g. 'prefix' -> prefix_train.json, prefix_val.json, prefix_test.json")
     parser.add_argument("--train_frac", type=float, default=0.8)
     parser.add_argument("--val_frac", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -46,9 +39,9 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    train_output = output_dir / f"{args.prefix}_train.json"
-    val_output = output_dir / f"{args.prefix}_val.json"
-    test_output = output_dir / f"{args.prefix}_test.json"
+    train_output = output_dir / f"train.json"
+    val_output = output_dir / f"val.json"
+    test_output = output_dir / f"test.json"
 
     with open(input_path, 'r') as f:
         dataset = json.load(f)
@@ -96,19 +89,6 @@ def main():
     print(f"  {train_output}")
     print(f"  {val_output}")
     print(f"  {test_output}")
-
-def print_case_distribution(dataset, splits):
-    print("\nCase distribution by split:")
-    all_case_labels = sorted({entry.get("case_label", "UNKNOWN") for entry in dataset})
-    header = f"{'case_label':<45}" + "".join(f"{name:>18}" for name in splits)
-    print(header)
-    for case_label in all_case_labels:
-        row = f"{case_label:<45}"
-        for name, split_data in splits.items():
-            count = sum(1 for e in split_data if e.get("case_label", "UNKNOWN") == case_label)
-            pct = 100 * count / len(split_data) if split_data else 0
-            row += f"{count:>8} ({pct:>5.1f}%)"
-        print(row)
 
 def show_case_stats(label, data):
     total = len(data)
