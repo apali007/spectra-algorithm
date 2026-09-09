@@ -26,7 +26,7 @@ EARLY_STOPPING="${4:-}"
 # so this is done via scontrol once the job is actually running instead.
 scontrol update JobId=$SLURM_JOB_ID JobName="spectra_train_${RUN_LABEL}"
 
-RUN_NAME="${RUN_LABEL}_${SLURM_JOB_ID}_$(date +%Y%m%d_%H%M%S)"
+RUN_NAME=""train_${RUN_LABEL}_${SLURM_JOB_ID}_$(date +%Y%m%d_%H%M%S)"
 mkdir -p logs/$RUN_NAME
 
 trap 'mv logs/_staging/${SLURM_JOB_ID}.log logs/$RUN_NAME/train.log 2>/dev/null; mv logs/_staging/${SLURM_JOB_ID}.err logs/$RUN_NAME/train.err 2>/dev/null' EXIT
