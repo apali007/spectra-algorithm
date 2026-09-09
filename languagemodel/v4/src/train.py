@@ -82,6 +82,9 @@ def main():
     cfg.val_set_dir = args.val_set_dir
     cfg.push_to_hub = args.push_to_hub
 
+    if int(os.environ.get("RANK", 0)) == 0:
+        cfg.save(f"{cfg.output_dir}/run_config.json")
+
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = cfg.model_id,
         max_seq_length = cfg.max_seq_length,
@@ -258,13 +261,6 @@ def main():
                 tokenizer,
                 save_method = "merged_16bit"
             )
-
-        """
-        Save the exact config used for this run, so the checkpoint dir is
-        self-describing later (which dataset, which prompt-adjacent settings,
-        which hyperparamters produced this model).
-        """
-        cfg.save(f"{cfg.output_dir}/run_config.json")
 
         if cfg.push_to_hub:
             if cfg.full_finetune:
