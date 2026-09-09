@@ -19,6 +19,7 @@ cd /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4
 RUN_LABEL="${1:-train}"
 TRAIN_SET_DIR="$2"
 VAL_SET_DIR="$3"
+EARLY_STOPPING="${4:-}"
 
 # Rename the job (visible in squeue) now that we know RUN_LABEL --
 # #SBATCH directives are fixed at submission time and can't use variables,
@@ -36,6 +37,9 @@ if [ -n "$TRAIN_SET_DIR" ]; then
 fi
 if [ -n "$VAL_SET_DIR" ]; then
   EXTRA_ARGS+=(--val_set_dir "$VAL_SET_DIR")
+fi
+if [ "$EARLY_STOPPING" = "early_stopping" ]; then
+  EXTRA_ARGS+=(--early_stopping)
 fi
 
 torchrun --nproc_per_node 2 \

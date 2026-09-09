@@ -59,6 +59,10 @@ def build_argparser(cfg: Config) -> argparse.ArgumentParser:
     parser.add_argument("--train_set_dir", default=cfg.train_set_dir)
     parser.add_argument("--val_set_dir", default=cfg.val_set_dir)
     parser.add_argument("--push_to_hub", default=cfg.push_to_hub)
+    parser.add_argument("--early_stopping", action="store_true", default=cfg.early_stopping_enabled,
+                        help="Enable early stopping (stop training if eval_loss hasn't " \
+                        "imporved for early_stopping_patience consecutive evals). " \
+                        "Off by default")
 
     return parser
 
@@ -159,7 +163,9 @@ def main():
         eval_dataset = eval_ds,
         processing_class = tokenizer,
     )
-    trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=cfg.early_stopping_patience))
+
+    if args.early_stopping:
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=cfg.early_stopping_patience))
 
     # --- Loss masking fix ---
     """Without this (and therefore every gradient update) is computed over

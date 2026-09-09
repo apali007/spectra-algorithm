@@ -45,6 +45,7 @@ class Config:
     logging_steps: int = 10
     seed: int = 42
     early_stopping_patience: int = 2
+    early_stopping_enabled: bool = False
 
      # NOTE: does NOT control the main QLoRA training load above (that always
     # uses 4-bit for the frozen base model via `not cfg.full_finetune`,
