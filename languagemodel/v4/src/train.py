@@ -7,6 +7,7 @@ import os
 import torch
 import logging
 from transformers import EarlyStoppingCallback
+import torch
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT
@@ -87,9 +88,6 @@ def main():
     cfg.push_to_hub = args.push_to_hub
     cfg.early_stopping_enabled = args.early_stopping
 
-    if int(os.environ.get("RANK", 0)) == 0:
-        cfg.save(f"{cfg.output_dir}/run_config.json")
-
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = cfg.model_id,
         max_seq_length = cfg.max_seq_length,
@@ -119,6 +117,17 @@ def main():
         )
 
     train_ds, eval_ds = load_and_format(cfg, tokenizer)
+
+    num_gpus = torch.cuda.device_count()
+    effective_batch_size = cfg.per_device_batch_size * cfg.grad_accum_steps * num_gpus
+    steps_per_epoch = len(train_ds) // effective_batch_size
+    eval_and_save_steps = max(1, steps_per_epoch // 10)
+
+    cfg.eval_steps = eval_and_save_steps
+    cfg.save_steps = eval_and_save_steps
+
+    if int(os.environ.get("RANK", 0)) == 0:
+        cfg.save(f"{cfg.output_dir}/run_config.json")
 
     training_args = SFTConfig(
         output_dir = cfg.output_dir,
@@ -152,6 +161,8 @@ def main():
         dataset_text_field = "text",
         max_length = cfg.max_seq_length,
         padding_free = False,
+
+        dataloader_drop_last = False,
 
         gradient_checkpointing = True,
         gradient_checkpointing_kwargs = {"use_reentrant": False},
@@ -189,33 +200,10 @@ def main():
 
     except Exception as e:
         logger.error(f"Trainer.train() raised: {type(e).__name__}: {e}")
-        logger.warning(f"Continuing using the tracked best checkpoints. Steps completed: {trainer.state.global_step}/{trainer.state.max_steps}.")
-
-    '''
-    Fraction-based eval_steps (e.g. 0.1) can round such that the very last
-    step never gets evaluated. so best_model_checkpoint might be missing a
-    fair comparision against the fully-trained model. Run one explicit final
-    eval here so that comparision is always available, regardless of rounding
-    '''
+        raise
+    
     final_metrics = trainer.evaluate()
-    final_eval_loss = final_metrics.get('eval_loss')
-    logger.info(f"Final eval (end of training): eval_loss={final_eval_loss}")
-
-    best_checkpoint = trainer.state.best_model_checkpoint
-
-    if trainer.state.best_metric is None or (final_eval_loss is not None and final_eval_loss < trainer.state.best_metric):
-        eval_loss_str = f"{final_eval_loss:.5f}" if final_eval_loss is not None else "N/A"
-        logger.info(f"Final training state (eval_loss={eval_loss_str}) beats or matches the "
-                    f"tracked best ({trainer.state.best_metric}); saving it explicitly.")
-        final_step_dir = f"{cfg.output_dir}/checkpoint-final-step"
-        if trainer.is_world_process_zero():
-            trainer.save_model(final_step_dir)
-        best_checkpoint = final_step_dir
-    elif best_checkpoint:
-        logger.info(f"Best checkpoint: {best_checkpoint} (eval_loss ={trainer.state.best_metric:.5f})")
-    else:
-        logger.info("No best checkpoint was tracked; using the final training state")
-
+    logger.info(f"Final eval (end of training): {final_metrics}") 
 
     # --- Multi-GPU (DDP) note ---
     """Under 'torchrun --nproc_per_node N src/train.py', this script runs once
@@ -226,31 +214,9 @@ def main():
 
     if trainer.is_world_process_zero():
 
-        final_dir = cfg.output_dir + "/final"
-
-        if best_checkpoint and not cfg.full_finetune:
-            '''
-            The live 'model' object may hold the LAST checkpoint's weights, not the
-            BEST one --  the automatic in-place reaload (model.load_adapter) crashed
-            due to a known peft/transformers bug before it could swap weights.
-            A fresh load from disk (same pattern inference.py already uses) avoids
-            that broken code path entirely.
-            '''
-            logger.info(f"Reloading best checkpoint fresh from disk: {best_checkpoint}")
-            del model
-            torch.cuda.empty_cache()
-            model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name = best_checkpoint,
-                max_seq_length = cfg.max_seq_length,
-                dtype = None,
-                load_in_4bit = cfg.load_in_4bit,
-            )
-
-            tokenizer.pad_token = tokenizer.eos_token
-            model.config.pad_token_id = tokenizer.eos_token_id
-    
-        model.save_pretrained(final_dir)
-        tokenizer.save_pretrained(final_dir)
+        final_path = os.path.join(cfg.output_dir, "final")
+        model.save_pretrained(final_path)
+        tokenizer.save_pretrained(final_path)
     
         if not cfg.full_finetune:
             merged_dir = cfg.output_dir + "/merged_16bit"

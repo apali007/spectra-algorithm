@@ -64,7 +64,7 @@ class Config:
     report_to: str = "wandb"
     wandb_project: str = "proteomics-reasoning-corpus"
     save_total_limit: int = 3
-    load_best_model_at_end: bool = True
+    load_best_model_at_end: bool = False
 
     # --- Multi-GPU (see next step) ---
     # Effective batch size = per_device_batch_size * grad_accum_steps * num_gpus.
