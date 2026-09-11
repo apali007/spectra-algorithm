@@ -7,7 +7,6 @@ import os
 import torch
 import logging
 from transformers import EarlyStoppingCallback
-import torch
 
 from config import Config
 from constants import SYSTEM_PROMPT, SAMPLE_INPUT

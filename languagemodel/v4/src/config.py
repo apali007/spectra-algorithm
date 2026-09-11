@@ -63,7 +63,7 @@ class Config:
     max_grad_norm: float = 1.0
     report_to: str = "wandb"
     wandb_project: str = "proteomics-reasoning-corpus"
-    save_total_limit: int = 3
+    save_total_limit: int = 5
     load_best_model_at_end: bool = False
 
     # --- Multi-GPU (see next step) ---
