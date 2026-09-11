@@ -570,7 +570,7 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
             print(f"scan number: {spec['scan_number']}")
             print(f"raw file: {spec['raw_file']}")
 
-        is_label_match, is_precusor_match, predicted_sequence, reasoning_trace, case_label = derive_peptide(
+        is_label_match, is_precursor_match, predicted_sequence, reasoning_trace, case_label = derive_peptide(
             spec['annotation_rows'],
             spec['peptide'],
             spec['precursor_mz'],
@@ -582,7 +582,7 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
 
         if VERBOSE:
             print(f"is_label_match: {is_label_match}")
-            print(f"is_precusor_match: {is_precusor_match}")
+            print(f"is_precursor_match: {is_precursor_match}")
             print(f"predicted_sequence: {predicted_sequence}")
             print(f"case_label: {case_label}")
         
@@ -592,7 +592,7 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
             if VERBOSE:
                 print(f"predicted sequence is correctly matches with the label peptide")
 
-        if is_precusor_match: 
+        if is_precursor_match: 
             count_precursor_match += 1
             if VERBOSE:
                 print(f"predicted sequence is correctly matches with the precursor information")
@@ -600,11 +600,11 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
         case_counts[case_label] = case_counts.get(case_label, 0) + 1
 
         # CASE_CLEAN_Y_ION_LADDER
-        # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precusor_match and is_label_match:
+        # if save_dataset and case_label == CASE_CLEAN_Y_ION_LADDER and is_precursor_match and is_label_match:
 
         # # ALL CASES
         if save_dataset:
-            if case_label == CASE_UNRESOLVABLE_MULTI_GAP or (is_label_match and is_precusor_match):
+            if case_label == CASE_UNRESOLVABLE_MULTI_GAP or (is_label_match and is_precursor_match):
 
             # if save_dataset:
                 dataset.append({
@@ -620,7 +620,7 @@ def process_prospect(annotation_data_path, meta_data_path, output_path, cache_pa
                 'raw_file': spec['raw_file'],
                 'pred_seq': predicted_sequence,
                 'is_label_match': is_label_match,
-                'is_precusor_match': is_precusor_match,
+                'is_precursor_match': is_precursor_match,
                 'case_label': case_label,
                 'mass_analyzer': spec['mass_analyzer']
                 })
