@@ -1,0 +1,106 @@
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : ======= System Information =======
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : Executed Command: /lclhome/apali007/miniconda3/envs/casanovo_env/bin/casanovo sequence /disk/dragon-storage/homes/apali007/projects/spectra_algorithm/languagemodel/v4/baselines/casanovo/input_data/TUM_third_pool/clean_y_ion_only_full_mass_analyzer_aware/test.mgf --evaluate
+2026-09-13 18:03:53,860 INFO [caslanguagemodel/v4/baselines/casanovo/resultsanovo/MainProcess] utils.log_system_info : Host Machine: dragon-compute-04
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : OS: Linux
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : OS Version: #236-Ubuntu SMP Fri Apr 11 19:53:21 UTC 2025
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : Python Version: 3.10.21
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : Casanovo Version: 5.2.1
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : Depthcharge Version: 0.4.10
+2026-09-13 18:03:53,860 INFO [casanovo/MainProcess] utils.log_system_info : PyTorch Version: 2.5.1+cu121
+2026-09-13 18:03:53,916 INFO [casanovo/MainProcess] utils.log_system_info : CUDA Version: 12.1
+2026-09-13 18:03:53,973 INFO [casanovo/MainProcess] utils.log_system_info : cuDNN Version: 90100
+2026-09-13 18:03:54,096 WARNING [casanovo/MainProcess] casanovo.setup_model : No model was specified. Using the default model 'orbitrap'. To make this choice explicit, use '--model orbitrap'.
+2026-09-13 18:03:54,099 INFO [casanovo/MainProcess] casanovo._get_model_weights : Model weights file /lclhome/apali007/.cache/casanovo/casanovo_orbitrap_v5-2-0.ckpt retrieved from local cache
+2026-09-13 18:03:54,099 INFO [casanovo/MainProcess] casanovo.setup_model : Casanovo version 5.2.1
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : model = /lclhome/apali007/.cache/casanovo/casanovo_orbitrap_v5-2-0.ckpt
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : config = default
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : output directory = /disk/dragon-storage/homes/apali007/projects/spectra_algorithm/languagemodel/v4/baselines/casanovo/results
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : output root name = casanovo_20260913180353
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : min_peptide_len = 6
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_peptide_len = 100
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : predict_batch_size = 1024
+2026-09-13 18:03:54,099 DEBUG [casanovo/MainProcess] casanovo.setup_model : top_match = 1
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : accelerator = auto
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : devices = None
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : n_beams = 1
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : precursor_mass_tol = 50.0
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : isotope_error_range = (0, 1)
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : enzyme = trypsin
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : digestion = full
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : missed_cleavages = 0
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_mods = 1
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : allowed_fixed_mods = C:C[Carbamidomethyl]
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : allowed_var_mods = M:M[Oxidation],N:N[Deamidated],Q:Q[Deamidated],nterm:[Acetyl]-,nterm:[Carbamyl]-,nterm:[Ammonia-loss]-,nterm:[+25.980265]-
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : random_seed = 454
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : n_log = 1
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : tb_summarywriter = False
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : log_metrics = False
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : log_every_n_steps = 50
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : lance_dir = None
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : val_check_interval = 50000
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : min_peaks = 20
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_peaks = 150
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : min_mz = 50.0
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_mz = 2500.0
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : min_intensity = 0.01
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : remove_precursor_tol = 2.0
+2026-09-13 18:03:54,100 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_charge = 4
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : dim_model = 512
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : n_head = 8
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : dim_feedforward = 1024
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : n_layers = 9
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : dropout = 0.0
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : dim_intensity = None
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : warmup_iters = 100000
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : cosine_schedule_period_iters = 600000
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : learning_rate = 0.0005
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : weight_decay = 1e-05
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : train_label_smoothing = 0.01
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : train_batch_size = 32
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : max_epochs = 30
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : shuffle = True
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : shuffle_buffer_size = 10000
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : num_sanity_val_steps = 0
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : calculate_precision = False
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : accumulate_grad_batches = 1
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : gradient_clip_val = 1.0
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : gradient_clip_algorithm = norm
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : precision = 32-true
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : replace_isoleucine_with_leucine = True
+2026-09-13 18:03:54,101 DEBUG [casanovo/MainProcess] casanovo.setup_model : massivekb_tokenizer = False
+2026-09-13 18:03:54,102 DEBUG [casanovo/MainProcess] casanovo.setup_model : residues = {'G': 57.021464, 'A': 71.037114, 'S': 87.032028, 'P': 97.052764, 'V': 99.068414, 'T': 101.04767, 'C[Carbamidomethyl]': 160.030649, 'L': 113.084064, 'I': 113.084064, 'N': 114.042927, 'D': 115.026943, 'Q': 128.058578, 'K': 128.094963, 'E': 129.042593, 'M': 131.040485, 'H': 137.058912, 'F': 147.068414, 'R': 156.101111, 'Y': 163.063329, 'W': 186.079313, 'M[Oxidation]': 147.0354, 'N[Deamidated]': 115.026943, 'Q[Deamidated]': 129.042594, '[Acetyl]-': 42.010565, '[Carbamyl]-': 43.005814, '[Ammonia-loss]-': -17.026549, '[+25.980265]-': 25.980265}
+2026-09-13 18:03:54,102 DEBUG [casanovo/MainProcess] casanovo.setup_model : new_token_init = {}
+2026-09-13 18:03:54,102 DEBUG [casanovo/MainProcess] casanovo.setup_model : n_workers = 0
+2026-09-13 18:03:54,125 INFO [casanovo/MainProcess] casanovo.sequence : Sequencing and evaluating peptides from:
+2026-09-13 18:03:54,125 INFO [casanovo/MainProcess] casanovo.sequence :   /disk/dragon-storage/homes/apali007/projects/spectra_algorithm/languagemodel/v4/baselines/casanovo/input_data/TUM_third_pool/clean_y_ion_only_full_mass_analyzer_aware/test.mgf
+2026-09-13 18:03:54,135 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : /lclhome/apali007/miniconda3/envs/casanovo_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /lclhome/apali007/miniconda3/envs/casanovo_env/b ...
+
+2026-09-13 18:03:54,135 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : /lclhome/apali007/miniconda3/envs/casanovo_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /lclhome/apali007/miniconda3/envs/casanovo_env/b ...
+
+2026-09-13 18:04:16,251 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : UserWarning: Skipped 44 spectra with invalid information.Last error was: 
+ Insufficient number of peaks
+2026-09-13 18:04:16,251 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : UserWarning: Skipped 44 spectra with invalid information.Last error was: 
+ Insufficient number of peaks
+2026-09-13 18:04:16,280 INFO [casanovo/MainProcess] dataloaders.setup : Test dataset contains 4366 spectra.
+2026-09-13 18:04:16,282 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : /lclhome/apali007/miniconda3/envs/casanovo_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /lclhome/apali007/miniconda3/envs/casanovo_env/b ...
+
+2026-09-13 18:04:16,282 WARNING [py.warnings/MainProcess] warnings._showwarnmsg : /lclhome/apali007/miniconda3/envs/casanovo_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /lclhome/apali007/miniconda3/envs/casanovo_env/b ...
+
+2026-09-13 18:04:34,941 INFO [casanovo/MainProcess] model_runner.log_metrics : Peptide Precision: 80.81%
+2026-09-13 18:04:34,942 INFO [casanovo/MainProcess] model_runner.log_metrics : Amino Acid Precision: 93.53%
+2026-09-13 18:04:34,942 INFO [casanovo/MainProcess] model_runner.log_metrics : Amino Acid Recall: 93.97%
+2026-09-13 18:04:34,943 INFO [casanovo/MainProcess] utils.log_run_report : ======= End of Run Report =======
+2026-09-13 18:04:34,943 INFO [casanovo/MainProcess] utils.log_run_report : Run Start Time: 26/09/13 18:03:53
+2026-09-13 18:04:34,943 INFO [casanovo/MainProcess] utils.log_run_report : Run End Time: 26/09/13 18:04:34
+2026-09-13 18:04:34,943 INFO [casanovo/MainProcess] utils.log_run_report : Time Elapsed: 0:00:41.083540
+2026-09-13 18:04:34,944 INFO [casanovo/MainProcess] utils.log_run_report : Max GPU Memory Utilization: 2094 MiB
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : Sequenced 4366 spectra
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : Score Distribution:
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : 4366 spectra (100.00%) scored ≥ 0.00
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : 3466 spectra (79.39%) scored ≥ 0.50
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : 528 spectra (12.09%) scored ≥ 0.90
+2026-09-13 18:04:39,084 INFO [casanovo/MainProcess] utils.log_annotate_report : 0 spectra (0.00%) scored ≥ 0.95
+2026-09-13 18:04:39,085 INFO [casanovo/MainProcess] utils.log_annotate_report : 0 spectra (0.00%) scored ≥ 0.99
+2026-09-13 18:04:39,085 INFO [casanovo/MainProcess] utils.log_annotate_report : Min Peptide Length: 6
+2026-09-13 18:04:39,085 INFO [casanovo/MainProcess] utils.log_annotate_report : Max Peptide Length: 29
+2026-09-13 18:04:39,085 INFO [casanovo/MainProcess] utils.log_annotate_report : Median Peptide Length: 11
