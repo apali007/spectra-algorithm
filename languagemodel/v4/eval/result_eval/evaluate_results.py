@@ -53,6 +53,11 @@ def extract_charge(input_text):
     pep_level_match = re.search(r"Precursor Charge: (\d+)", input_text)
     return int(pep_level_match.group(1)) if pep_level_match else None
 
+
+def extract_mass_analyzer(input_text: str) -> str | None:
+    match = re.search(r"Mass Analyzer:\s*(FTMS|ITMS)", input_text)
+    return match.group(1) if match else None
+
 def mass(aa):
     return AA_MASSES.get(aa, float('nan'))
 
@@ -120,6 +125,9 @@ def evaluate(results_path, output_path, mode):
     precursor_charge_totals = Counter()
     precursor_charge_matches = Counter()
 
+    mass_analyzer_totals = Counter()
+    mass_analyzer_matches = Counter()
+
     reasoning_case_matches = Counter()
     generated_by_expected = defaultdict(Counter)
 
@@ -150,9 +158,11 @@ def evaluate(results_path, output_path, mode):
 
         pep_len = len(ground_truth)
         charge = extract_charge(item.get('input', ''))
+        mass_analyzer = extract_mass_analyzer(item.get('input', ''))
         
         pep_len_totals[pep_len] += 1
         precursor_charge_totals[charge] += 1
+        mass_analyzer_totals[mass_analyzer] += 1
 
         predicted_peptide = extract_predicted_peptide(prediction) if prediction is not None else None
 
@@ -178,6 +188,7 @@ def evaluate(results_path, output_path, mode):
             pep_len_matches[pep_len] += 1
             nl_matches[used_nl] += 1
             precursor_charge_matches[charge] += 1 
+            mass_analyzer_matches[mass_analyzer] +=1
 
 
     pred_extracted_total = resolvable_total - no_extraction
@@ -245,6 +256,12 @@ def evaluate(results_path, output_path, mode):
         ch_total = precursor_charge_totals[charge]
         ch_match = precursor_charge_matches[charge]
         print(f" precursor charge {charge}: {ch_match}/{ch_total} ({100*ch_match/ch_total:.1f}%)")
+
+    print("\n performance by mass analyzer:")
+    for mass_analyzer in sorted(mass_analyzer_totals, key=lambda x: (x is None, x)):
+        ma_total = mass_analyzer_totals[mass_analyzer]
+        ma_match = mass_analyzer_matches[mass_analyzer]
+        print(f" mass_analyzer {mass_analyzer}: {ma_match}/{ma_total} ({100*ma_match/ma_total:.1f}%)")
 
     print("\n reasoning-structure match (did it follow the right derivation pattern?):")
     total_reasoning_matches = sum(reasoning_case_matches.values())
@@ -320,6 +337,14 @@ def evaluate(results_path, output_path, mode):
             }
             for charge in sorted(precursor_charge_totals, key=lambda x: (x is None, x))
         },
+        "accuracy_by_mass_analyzer": {
+                    str(mass_analyzer): {
+                        "total": mass_analyzer_totals[mass_analyzer],
+                        "matches": mass_analyzer_matches[mass_analyzer],
+                        "accuracy_pct": 100*mass_analyzer_matches[mass_analyzer]/mass_analyzer_totals[mass_analyzer] if mass_analyzer_totals[mass_analyzer] else 0.0,
+                    }
+                    for mass_analyzer in sorted(mass_analyzer_totals, key=lambda x: (x is None, x))
+                },
         "reasoning_structure_match": {
             "overall_pct": 100*sum(reasoning_case_matches.values())/total if total else 0.0,
             "by_case_label": {
