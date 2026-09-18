@@ -8,6 +8,8 @@
 # Generated outputs
 output/
 
+results/
+
 input_data/
 
 checkpoints/
