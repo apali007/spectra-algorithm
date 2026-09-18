@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 import os
 import sys
 import argparse
+from casanovo_eval import aa_match_batch, aa_match_metrics
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'src'))
 from constants import (
@@ -122,6 +123,8 @@ def evaluate(results_path, output_path, mode):
     reasoning_case_matches = Counter()
     generated_by_expected = defaultdict(Counter)
 
+    pred_seqs, true_seqs = [], []
+
     for item in results:
         if mode == "output":
             ground_truth = item.get('ground_truth')
@@ -142,8 +145,8 @@ def evaluate(results_path, output_path, mode):
             unresolvable_total += 1
             continue
 
+        # RESOLABLE CASES
         resolvable_total +=1
-
 
         pep_len = len(ground_truth)
         charge = extract_charge(item.get('input', ''))
@@ -152,6 +155,9 @@ def evaluate(results_path, output_path, mode):
         precursor_charge_totals[charge] += 1
 
         predicted_peptide = extract_predicted_peptide(prediction) if prediction is not None else None
+
+        pred_seqs.append(predicted_peptide)
+        true_seqs.append(ground_truth)
 
         if predicted_peptide is None:
             no_extraction += 1 
@@ -260,6 +266,13 @@ def evaluate(results_path, output_path, mode):
             pct = 100*count/c_total if c_total else 0.0
             print(f" -> generated {label}: {count} ({pct:.1f}%)")
 
+
+    print(" \n Casanovo evaluation metric: ")
+    casanovo_aa_precision, casanovo_aa_recall, casanovo_pep_precision = aa_match_metrics(*aa_match_batch(true_seqs, pred_seqs, AA_MASSES))
+    print(f"casanovo_aa_precision: {casanovo_aa_precision*100:.2f}")
+    print(f"casanovo_aa_recall: {casanovo_aa_recall*100:.2f}")
+    print(f"casanovo_pep_precision: {casanovo_pep_precision*100:.2f}")
+
     metrics = {
         "input_path": results_path,
         "output_path": output_path,
@@ -321,6 +334,11 @@ def evaluate(results_path, output_path, mode):
         "generated_case_breakdown": {
             expected_case: dict(generated_by_expected[expected_case])
             for expected_case in sorted(case_totals)
+        },
+        "casanovo_evaluation_metric": {
+            "casanovo_aa_precision": casanovo_aa_precision*100,
+            "casanovo_aa_recall": casanovo_aa_recall*100,
+            "casanovo_pep_precision": casanovo_pep_precision*100,
         },
     }
 
