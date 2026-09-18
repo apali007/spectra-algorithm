@@ -2,6 +2,8 @@
 *.parquet
 *.csv
 *.zip
+*.log
+*.mztab
 
 # Generated outputs
 output/
