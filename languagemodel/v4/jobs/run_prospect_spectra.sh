@@ -19,7 +19,9 @@ mkdir -p logs/$RUN_NAME
 
 trap 'mv logs/_staging/${SLURM_JOB_ID}.log logs/$RUN_NAME/output.log 2>/dev/null; mv logs/_staging/${SLURM_JOB_ID}.err logs/$RUN_NAME/error.err 2>/dev/null' EXIT
 
-python eval/token_length_stats.py --input data/input_data/TUM_third_pool/mass_analyzer_aware_prospect_reasoning_dataset.json
+python3 scripts/filter_dataset.py
+
+# python eval/token_length_stats.py --input data/input_data/TUM_third_pool/mass_analyzer_aware_prospect_reasoning_dataset.json
 
 # python src/reasoning_corpus.py
 
