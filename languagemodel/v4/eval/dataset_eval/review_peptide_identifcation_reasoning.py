@@ -16,23 +16,18 @@ NEUTRAL_LOSS_MASSES = {
 MASS_PROTON =  1.00728
 MASS_C13    = 1.00335 # Mass Difference between C-12 and C-13
 
-precursor_mass = 695.328195
+precursor_mass = 590.27440
 precursor_charge = 3
-# prev_mz = 977.50950
-# peptide_sequence = "RSDGTWGTEAGPGWAPWPR"
-peptide_sequence = "RGWNFAWRQETNVNPR"
-# peptid_sequence = "RALEELHQ"
+# peptide_sequence = "ICPLNLEISHNADK"
+# peptide_sequence = "NEEQNLQELSHNADK"
+peptide_sequence = "ICPBNLQEISHNADK"
 
 precursor_neutral_mass = precursor_mass * precursor_charge - precursor_charge * MASS_PROTON
 aa_residues = list(peptide_sequence)
 
-# aa_sum = sum(AA_MASSES[aa] for aa in peptid_sequence)
-
-# print(f"diff prez is {aa_sum + MASS_PROTON - prev_mz}.")
-
 print(f"Precursor neutral mass: {precursor_neutral_mass}")
 
-aa_sum = sum(AA_MASSES[aa] for aa in peptide_sequence)
+aa_sum = sum(AA_MASSES[aa] for aa in peptide_sequence if aa in AA_MASSES)
 
 aa_sum_water = aa_sum + NEUTRAL_LOSS_MASSES['H2O']
 

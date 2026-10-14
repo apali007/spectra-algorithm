@@ -88,9 +88,14 @@ def evaluate_aa_level_performance(aa_level_match, aa_level_ground_truth_total, a
 
     return aa_level_match, aa_level_ground_truth_total, aa_level_pred_total
              
-def evaluate(results_path, output_path, mode):
+def evaluate(results_path, save_output, mode):
 
     print(results_path)
+
+    output_path = None
+    if save_output:
+        base, _ = os.path.splitext(results_path)
+        output_path = f"{base}_eval.json"
 
     with open(results_path, 'r') as f:        
         results = json.load(f)
@@ -387,13 +392,12 @@ def build_argparser():
                          help="'output' reads inference.py's prediction/ground_truth fields; "
                               "'corpus' reads the raw dataset's output/peptide fields as a "
                               "data-quality check (does the corpus's own derivation match its label)")
-    parser.add_argument("--output", type=str, default=None,
-                        help="Optional path to save evaluation results as JSON. "
-                             "If not provided, results are only printed to stdout.")
+    parser.add_argument("--save_output", action="store_true",
+                        help="Optional path to save evaluation results as JSON. ")
                               
     return parser
 
 if __name__ == "__main__":
     parser = build_argparser()
     args = parser.parse_args()
-    evaluate(args.input, args.output, args.mode)
+    evaluate(args.input, args.save_output, args.mode)

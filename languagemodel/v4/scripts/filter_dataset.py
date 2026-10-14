@@ -2,8 +2,8 @@ import json
 import re
 
 INPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/input_data/TUM_third_pool/mass_analyzer_aware_prospect_reasoning_dataset.json"
-OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/input_data/TUM_third_pool/clean_y_ion_FTMS_charge_2_3_no_nl_pep_len_15_dataset.json"
-MAX_LENGTH = 15
+OUTPUT_PATH = "/lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/data/input_data/TUM_third_pool/clean_y_ion_FTMS_charge_2_no_nl_pep_len_12_dataset.json"
+MAX_LENGTH = 12
 
 with open(INPUT_PATH) as f:
     data = json.load(f)
@@ -19,7 +19,7 @@ for item in data:
     if item.get("mass_analyzer") != "FTMS":
         continue
     charge = get_charge(item.get("input", ""))
-    if charge is None or charge > 3:
+    if charge is None or charge > 2:
         continue
     if "neutral loss" in item.get("output", "").lower():
         continue

@@ -19,5 +19,4 @@ mkdir -p logs/$RUN_NAME
 
 trap 'mv /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/${SLURM_JOB_ID}.log /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/$RUN_NAME/output.log 2>/dev/null; mv /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/_staging/${SLURM_JOB_ID}.err /lclhome/apali007/projects/spectra_algorithm/languagemodel/v4/logs/$RUN_NAME/error.err 2>/dev/null' EXIT
 
-cd baselines/casanovo/results
-casanovo sequence /disk/dragon-storage/homes/apali007/projects/spectra_algorithm/languagemodel/v4/baselines/casanovo/input_data/TUM_third_pool/clean_y_ion_only_full_mass_analyzer_aware/test.mgf --evaluate
+casanovo sequence baselines/casanovo/input_data/TUM_third_pool/clean_y_ion_FTMS_charge_2_3_no_nl_pep_len_15/test.mgf --evaluate --output_dir baselines/casanovo/results/TUM_third_pool/clean_y_ion_FTMS_charge_2_3_no_nl_pep_len_15
