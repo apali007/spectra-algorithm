@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def spectra_key(item):
     raw_file = item.get('raw_file')
     scan_number = item.get('scan_number')
-    peptide = item.get('peptide')
+    peptide = item.get('peptide') or item.get('ground_truth')
     return f"{raw_file}::{scan_number}::{peptide}"
 
 def build_argsparser() -> argparse.ArgumentParser:
